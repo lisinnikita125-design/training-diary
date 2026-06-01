@@ -1920,6 +1920,42 @@ async function changePassword() {
         msg.textContent = '❌ ' + d.message;
     }
 }
+
+async function showAdmin() {
+    document.getElementById('settingsMenu').classList.add('hidden');
+    document.getElementById('adminModal').style.display = 'flex';
+    const resp = await fetch('/admin/users');
+    if (!resp.ok) { alert('Нет доступа'); return; }
+    const data = await resp.json();
+    const list = document.getElementById('adminUsersList');
+    list.innerHTML = data.users.map(u => `
+        <div style="background:var(--bg);border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+            <div>
+                <div style="font-weight:600;font-size:14px;color:var(--text)">${u.name || 'Без имени'} ${u.is_admin ? '👑' : ''}</div>
+                <div style="font-size:12px;color:var(--text2)">${u.email}</div>
+                <div style="font-size:11px;color:var(--text2)">тренировок: ${u.workout_count} · ${(u.created_at||'').slice(0,10)}</div>
+            </div>
+            ${u.is_admin ? '' : '<button onclick="deleteUser(' + u.id + ',\'' + u.email + '\')" style="background:#c62828;color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;">🗑</button>'}
+        </div>
+    `).join('');
+}
+
+async function deleteUser(id, email) {
+    if (!confirm('Удалить ' + email + ' и все его данные?')) return;
+    const resp = await fetch('/admin/delete-user/' + id, {method: 'DELETE'});
+    const d = await resp.json();
+    if (resp.ok) showAdmin();
+    else alert(d.message);
+}
+
+async function checkAdminAccess() {
+    const resp = await fetch('/check-auth');
+    const d = await resp.json();
+    if (d.auth && d.is_admin) {
+        const btn = document.getElementById('adminMenuBtn');
+        if (btn) btn.style.display = 'flex';
+    }
+}
 </script>
 <div id="profileModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;">
     <div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px;">
