@@ -862,7 +862,7 @@ async function loadWorkoutHistory() {
                     </div>
                     <div style="text-align:right;">
                         <div style="font-weight:700;color:var(--green);font-size:14px;">${Math.round(w.total_tonnage)} кг</div>
-                        <div style="font-size:11px;color:var(--text2);">тоннаж</div>
+                        <div style="font-size:11px;color:var(--text2);">${w.duration_seconds ? '⏱ ' + Math.floor(w.duration_seconds/60) + ' мин' : 'тоннаж'}</div>
                     </div>
                 </div>
                 <div id="hist-detail-${idx}" class="hidden" style="border-top:1px solid var(--border);">

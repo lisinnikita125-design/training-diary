@@ -1222,7 +1222,8 @@ def workout_history():
         # Получаем упражнения за этот день
         sets = cur.execute("""
             SELECT e.name, wl.set_number, wl.weight, wl.reps, wl.difficulty,
-                   SUM(wl.weight * wl.reps) OVER (PARTITION BY e.name) as ex_tonnage
+                   SUM(wl.weight * wl.reps) OVER (PARTITION BY e.name) as ex_tonnage,
+                   MAX(wl.duration_seconds) OVER () as duration_seconds
             FROM workout_log wl
             JOIN exercises e ON e.id = wl.exercise_id
             WHERE wl.workout_date = ? AND e.day_id = ? AND wl.set_number > 0
