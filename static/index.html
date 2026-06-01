@@ -1260,7 +1260,7 @@ async function saveWorkout() {
     }
     const date = new Date().toISOString().split('T')[0];
     try {
-        const resp = await fetch('/log', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({day_id:parseInt(dayId), date, exercises})});
+        const resp = await fetch('/log', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({day_id:parseInt(dayId), date, exercises, duration_seconds: workoutStartTime ? Math.floor((Date.now() - workoutStartTime) / 1000) : null})});
         if (resp.ok) {
             const duration = stopWorkoutTimer();
                     showToast('✅ Сохранено!' + (duration ? ' Время: ' + duration : ''));

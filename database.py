@@ -83,6 +83,12 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_workout_exercise ON workout_log(exercise_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_recovery_user ON recovery_log(user_id)")
 
+    # Добавляем duration_seconds если нет
+    try:
+        cur.execute("ALTER TABLE workout_log ADD COLUMN duration_seconds INTEGER")
+    except Exception:
+        pass
+
     # Добавляем user_id в workout_log если его ещё нет (миграция)
     try:
         cur.execute("ALTER TABLE workout_log ADD COLUMN user_id INTEGER REFERENCES users(id)")

@@ -333,10 +333,10 @@ def log_workout():
         for s in ex_log["sets"]:
             weight = s.get("weight") if s.get("weight") is not None else exercise["default_weight"]
             cur.execute("""
-                INSERT INTO workout_log (user_id, exercise_id, workout_date, set_number, weight, reps, difficulty, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO workout_log (user_id, exercise_id, workout_date, set_number, weight, reps, difficulty, notes, duration_seconds)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (uid, ex_log["exercise_id"], data["date"], s["set_number"],
-                  weight, s["reps"], s.get("difficulty"), s.get("notes")))
+                  weight, s["reps"], s.get("difficulty"), s.get("notes"), data.get("duration_seconds")))
 
     conn.commit()
     conn.close()
