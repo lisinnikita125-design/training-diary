@@ -831,6 +831,8 @@ def ai_analyze():
     # Данные последней тренировки
     last_sets = []
     if last_date:
+        last_duration = cur.execute("SELECT MAX(duration_seconds) as dur FROM workout_log WHERE workout_date = ? AND (user_id = ? OR user_id IS NULL)", (last_date, uid)).fetchone()
+        last_dur_min = round(last_duration["dur"] / 60) if last_duration and last_duration["dur"] else None
         last_sets = cur.execute("""
             SELECT e.name, wl.set_number, wl.weight, wl.reps, wl.difficulty
             FROM workout_log wl
@@ -908,7 +910,7 @@ def ai_analyze():
     prompt = (
         "Ты — персональный AI-тренер и спортивный врач. Я медбрат, тренируюсь 3 раза в неделю "
         "(день 1: верх, день 2: ноги+талия, день 3: верх). Мои цели: рост силы, контроль техники, профилактика травм.\n\n"
-        "ПОСЛЕДНЯЯ ТРЕНИРОВКА (" + (last_date or "?") + "):\n" + last_summary + "\n\n"
+        "ПОСЛЕДНЯЯ ТРЕНИРОВКА (" + (last_date or "?") + ((" [" + str(last_dur_min) + " мин]") if last_dur_min else "") + ":\n" + last_summary + "\n\n"
         "ПРЕДЫДУЩАЯ ТРЕНИРОВКА ЭТОГО ДНЯ:\n" + prev_summary + "\n\n"
         "ТОННАЖ ПО НЕДЕЛЯМ (30 дней): " + weekly_summary + "\n"
         "ЛИЧНЫЕ РЕКОРДЫ: " + records_summary +
