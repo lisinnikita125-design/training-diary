@@ -1,0 +1,25 @@
+{
+  "completed": "2026-05-11T09:46:33.228068Z",
+  "periodic": true,
+  "started": "2026-05-11T09:46:23.479318Z",
+  "versions": [
+    {
+      "filename": "pip-26.1.1-py3-none-any.whl",
+      "found_date": "2026-05-11T09:46:23.891335Z",
+      "release_date": "2026-05-04T19:02:18.000000Z",
+      "source": "periodic"
+    },
+    {
+      "filename": "pip-26.1-py3-none-any.whl",
+      "found_date": "2026-05-11T09:46:27.521830Z",
+      "release_date": "2026-04-26T21:00:03.000000Z",
+      "source": "periodic"
+    },
+    {
+      "filename": "pip-26.0.1-py3-none-any.whl",
+      "found_date": "2026-05-11T09:46:30.442202Z",
+      "release_date": "2026-02-05T02:20:16.000000Z",
+      "source": "periodic"
+    }
+  ]
+}
