@@ -168,7 +168,11 @@ def logout():
 @app.route("/check-auth")
 def check_auth():
     if session.get("auth"):
-        return jsonify({"auth": True, "name": session.get("user_name", "")})
+        conn = get_db()
+        user = conn.execute("SELECT is_admin FROM users WHERE id=?", (current_user_id(),)).fetchone()
+        conn.close()
+        is_admin = bool(user and user["is_admin"])
+        return jsonify({"auth": True, "name": session.get("user_name", ""), "is_admin": is_admin})
     return jsonify({"auth": False})
 
 
@@ -271,6 +275,47 @@ def backup_db():
     for old in backups[:-7]:
         os.remove(old)
 
+
+
+# ══════════════════════════════════════════════
+#  АДМИН
+# ══════════════════════════════════════════════
+def require_admin():
+    if not session.get("auth"):
+        abort(401)
+    conn = get_db()
+    user = conn.execute("SELECT is_admin FROM users WHERE id=?", (current_user_id(),)).fetchone()
+    conn.close()
+    if not user or not user["is_admin"]:
+        abort(403)
+
+@app.route("/admin/users")
+def admin_users():
+    require_admin()
+    conn = get_db()
+    users = conn.execute("""
+        SELECT u.id, u.email, u.name, u.age, u.gender, u.is_verified, u.created_at,
+               COUNT(DISTINCT wl.workout_date) as workout_count
+        FROM users u
+        LEFT JOIN workout_log wl ON wl.user_id = u.id AND wl.set_number > 0
+        GROUP BY u.id
+        ORDER BY u.created_at DESC
+    """).fetchall()
+    conn.close()
+    return jsonify({"users": [dict(u) for u in users]})
+
+@app.route("/admin/delete-user/<int:user_id>", methods=["DELETE"])
+def admin_delete_user(user_id):
+    require_admin()
+    if user_id == current_user_id():
+        return jsonify({"status": "error", "message": "Нельзя удалить себя"}), 400
+    conn = get_db()
+    conn.execute("DELETE FROM workout_log WHERE user_id=?", (user_id,))
+    conn.execute("DELETE FROM recovery_log WHERE user_id=?", (user_id,))
+    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
 
 # ══════════════════════════════════════════════
 #  ПРОФИЛЬ
