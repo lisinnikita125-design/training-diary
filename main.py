@@ -48,8 +48,6 @@ def migrate_existing_data():
         conn.commit()
     conn.close()
 
-migrate_existing_data()
-
 
 def send_email(to, subject, body_html):
     """Отправка письма через SMTP. Молча проглатывает ошибки."""
@@ -1069,24 +1067,6 @@ def ai_analyze():
 # ══════════════════════════════════════════════
 #  RECOVERY — сохранение показателей самочувствия
 # ══════════════════════════════════════════════
-def ensure_recovery_table():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS recovery_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            log_date TEXT NOT NULL UNIQUE,
-            sleep INTEGER,
-            energy INTEGER,
-            stress INTEGER,
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-ensure_recovery_table()
 
 
 @app.route("/recovery", methods=["POST"])
@@ -1327,7 +1307,8 @@ def workout_history():
         sets = cur.execute("""
             SELECT e.name, wl.set_number, wl.weight, wl.reps, wl.difficulty,
                    SUM(wl.weight * wl.reps) OVER (PARTITION BY e.name) as ex_tonnage,
-                   MAX(wl.duration_seconds) OVER () as duration_seconds
+                   (SELECT MAX(duration_seconds) FROM workout_log
+                    WHERE workout_date = ? AND (user_id = ? OR user_id IS NULL)) as duration_seconds
             FROM workout_log wl
             JOIN exercises e ON e.id = wl.exercise_id
             WHERE wl.workout_date = ? AND e.day_id = ? AND wl.set_number > 0
