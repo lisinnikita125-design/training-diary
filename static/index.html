@@ -22,7 +22,7 @@ async function showProfile() {
     document.getElementById('profileGender').value = d.gender || '';
     document.getElementById('profileWeight').value = d.weight_kg || '';
     document.getElementById('profileMsg').textContent = '';
-    document.getElementById('profileModal').classList.remove('hidden');
+    document.getElementById('profileModal').style.display='flex';
 }
 
 async function saveProfile() {
@@ -1828,6 +1828,58 @@ async function loadStats() {
         });
     } catch(e) {}
 }
+
+async function showProfile() {
+    document.getElementById('settingsMenu').classList.add('hidden');
+    const resp = await fetch('/profile');
+    const d = await resp.json();
+    document.getElementById('profileEmail').textContent = '📧 ' + d.email;
+    document.getElementById('profileName').value = d.name || '';
+    document.getElementById('profileAge').value = d.age || '';
+    document.getElementById('profileGender').value = d.gender || '';
+    document.getElementById('profileWeight').value = d.weight_kg || '';
+    document.getElementById('profileMsg').textContent = '';
+    document.getElementById('profileModal').style.display='flex';
+}
+
+async function saveProfile() {
+    const msg = document.getElementById('profileMsg');
+    const resp = await fetch('/profile', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: document.getElementById('profileName').value.trim(),
+            age: parseInt(document.getElementById('profileAge').value) || null,
+            gender: document.getElementById('profileGender').value || null,
+            weight_kg: parseFloat(document.getElementById('profileWeight').value) || null
+        })
+    });
+    msg.style.color = '#2e7d32';
+    msg.textContent = '✅ Сохранено!';
+    setTimeout(() => msg.textContent = '', 2000);
+}
+
+async function changePassword() {
+    const msg = document.getElementById('profileMsg');
+    const resp = await fetch('/change-password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            old_password: document.getElementById('oldPassword').value,
+            new_password: document.getElementById('newPassword').value
+        })
+    });
+    const d = await resp.json();
+    if (resp.ok) {
+        msg.style.color = '#2e7d32';
+        msg.textContent = '✅ ' + d.message;
+        document.getElementById('oldPassword').value = '';
+        document.getElementById('newPassword').value = '';
+    } else {
+        msg.style.color = '#c62828';
+        msg.textContent = '❌ ' + d.message;
+    }
+}
 </script>
 <div id="profileModal" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;">
     <div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px;">
@@ -1850,7 +1902,7 @@ async function loadStats() {
         <input id="newPassword" type="password" placeholder="Новый пароль" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
         <button class="btn-secondary" onclick="changePassword()">Изменить пароль</button>
         <span id="profileMsg" style="font-size:13px;text-align:center;min-height:16px;"></span>
-        <button class="btn-secondary" onclick="document.getElementById('profileModal').classList.add('hidden')">✕ Закрыть</button>
+        <button class="btn-secondary" onclick="document.getElementById('profileModal').style.display='none'">✕ Закрыть</button>
     </div>
 </div>
 </body>
