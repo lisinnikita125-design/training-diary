@@ -90,6 +90,13 @@ def init_db():
         pass
 
     # Добавляем user_id в workout_log если его ещё нет (миграция)
+    # Добавляем поля профиля если нет
+    for col, typ in [("age", "INTEGER"), ("gender", "TEXT"), ("weight_kg", "REAL")]:
+        try:
+            cur.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
+        except Exception:
+            pass
+
     try:
         cur.execute("ALTER TABLE workout_log ADD COLUMN user_id INTEGER REFERENCES users(id)")
     except Exception:

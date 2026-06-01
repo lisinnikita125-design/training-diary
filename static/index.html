@@ -11,7 +11,60 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="/icon-192.png">
     <meta name="theme-color" content="#e31e24">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js">
+async function showProfile() {
+    document.getElementById('settingsMenu').classList.add('hidden');
+    const resp = await fetch('/profile');
+    const d = await resp.json();
+    document.getElementById('profileEmail').textContent = '📧 ' + d.email;
+    document.getElementById('profileName').value = d.name || '';
+    document.getElementById('profileAge').value = d.age || '';
+    document.getElementById('profileGender').value = d.gender || '';
+    document.getElementById('profileWeight').value = d.weight_kg || '';
+    document.getElementById('profileMsg').textContent = '';
+    document.getElementById('profileModal').classList.remove('hidden');
+}
+
+async function saveProfile() {
+    const msg = document.getElementById('profileMsg');
+    const resp = await fetch('/profile', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: document.getElementById('profileName').value.trim(),
+            age: parseInt(document.getElementById('profileAge').value) || null,
+            gender: document.getElementById('profileGender').value || null,
+            weight_kg: parseFloat(document.getElementById('profileWeight').value) || null
+        })
+    });
+    const d = await resp.json();
+    msg.style.color = '#2e7d32';
+    msg.textContent = '✅ Сохранено!';
+    setTimeout(() => msg.textContent = '', 2000);
+}
+
+async function changePassword() {
+    const msg = document.getElementById('profileMsg');
+    const resp = await fetch('/change-password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            old_password: document.getElementById('oldPassword').value,
+            new_password: document.getElementById('newPassword').value
+        })
+    });
+    const d = await resp.json();
+    if (resp.ok) {
+        msg.style.color = '#2e7d32';
+        msg.textContent = '✅ ' + d.message;
+        document.getElementById('oldPassword').value = '';
+        document.getElementById('newPassword').value = '';
+    } else {
+        msg.style.color = '#c62828';
+        msg.textContent = '❌ ' + d.message;
+    }
+}
+</script>
     <title>World Class — Тренировочный дневник</title>
     <style>
         * { box-sizing: border-box; }
@@ -274,6 +327,9 @@
         border:1px solid var(--border);
     ">
         <div style="padding:8px 0;">
+            <button onclick="showProfile()" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:14px;color:var(--text);display:flex;align-items:center;gap:10px;">
+                👤 Профиль
+            </button>
             <button onclick="doLogout()" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:14px;color:var(--text);display:flex;align-items:center;gap:10px;">
                 🚪 Выйти
             </button>
@@ -1773,5 +1829,29 @@ async function loadStats() {
     } catch(e) {}
 }
 </script>
+<div id="profileModal" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px;">
+        <h3 style="margin:0;color:var(--text)">👤 Профиль</h3>
+        <div style="font-size:13px;color:var(--text2)" id="profileEmail"></div>
+        <input id="profileName" placeholder="Имя" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
+        <div style="display:flex;gap:8px;">
+            <input id="profileAge" type="number" placeholder="Возраст" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;width:50%;">
+            <select id="profileGender" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;width:50%;">
+                <option value="">Пол</option>
+                <option value="мужской">Мужской</option>
+                <option value="женский">Женский</option>
+            </select>
+        </div>
+        <input id="profileWeight" type="number" step="0.1" placeholder="Вес тела (кг)" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
+        <button class="btn-primary" onclick="saveProfile()">💾 Сохранить</button>
+        <hr style="border:none;border-top:1px solid var(--border);margin:4px 0;">
+        <h4 style="margin:0;color:var(--text)">🔒 Сменить пароль</h4>
+        <input id="oldPassword" type="password" placeholder="Текущий пароль" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
+        <input id="newPassword" type="password" placeholder="Новый пароль" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
+        <button class="btn-secondary" onclick="changePassword()">Изменить пароль</button>
+        <span id="profileMsg" style="font-size:13px;text-align:center;min-height:16px;"></span>
+        <button class="btn-secondary" onclick="document.getElementById('profileModal').classList.add('hidden')">✕ Закрыть</button>
+    </div>
+</div>
 </body>
 </html>

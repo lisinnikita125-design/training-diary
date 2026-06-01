@@ -273,6 +273,53 @@ def backup_db():
 
 
 # ══════════════════════════════════════════════
+#  ПРОФИЛЬ
+# ══════════════════════════════════════════════
+@app.route("/profile", methods=["GET"])
+def get_profile():
+    require_auth()
+    conn = get_db()
+    user = conn.execute(
+        "SELECT email, name, age, gender, weight_kg, created_at FROM users WHERE id = ?",
+        (current_user_id(),)
+    ).fetchone()
+    conn.close()
+    return jsonify(dict(user))
+
+@app.route("/profile", methods=["POST"])
+def update_profile():
+    require_auth()
+    data = request.get_json() or {}
+    conn = get_db()
+    conn.execute(
+        "UPDATE users SET name=?, age=?, gender=?, weight_kg=? WHERE id=?",
+        (data.get("name"), data.get("age"), data.get("gender"), data.get("weight_kg"), current_user_id())
+    )
+    conn.commit()
+    conn.close()
+    session["user_name"] = data.get("name") or session.get("user_name")
+    return jsonify({"status": "ok"})
+
+@app.route("/change-password", methods=["POST"])
+def change_password():
+    require_auth()
+    data = request.get_json() or {}
+    old_pwd = data.get("old_password", "")
+    new_pwd = data.get("new_password", "")
+    if len(new_pwd) < 6:
+        return jsonify({"status": "error", "message": "Пароль минимум 6 символов"}), 400
+    conn = get_db()
+    user = conn.execute("SELECT password_hash FROM users WHERE id=?", (current_user_id(),)).fetchone()
+    if not check_password_hash(user["password_hash"], old_pwd):
+        conn.close()
+        return jsonify({"status": "error", "message": "Неверный текущий пароль"}), 401
+    conn.execute("UPDATE users SET password_hash=? WHERE id=?",
+                 (generate_password_hash(new_pwd), current_user_id()))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok", "message": "Пароль изменён"})
+
+# ══════════════════════════════════════════════
 #  ДНИ И УПРАЖНЕНИЯ
 # ══════════════════════════════════════════════
 @app.route("/day/<int:day_id>")
@@ -907,9 +954,19 @@ def ai_analyze():
             + ("Стресс: " + str(stress) + "/5\n" if stress else "")
         )
 
+    # Получаем профиль для AI
+    conn2 = get_db()
+    profile = conn2.execute("SELECT age, gender, weight_kg FROM users WHERE id=?", (uid,)).fetchone()
+    conn2.close()
+    profile_str = ""
+    if profile:
+        if profile["age"]: profile_str += f"Возраст: {profile['age']} лет. "
+        if profile["gender"]: profile_str += f"Пол: {profile['gender']}. "
+        if profile["weight_kg"]: profile_str += f"Вес тела: {profile['weight_kg']} кг. "
+
     prompt = (
         "Ты — персональный AI-тренер и спортивный врач. Я медбрат, тренируюсь 3 раза в неделю "
-        "(день 1: верх, день 2: ноги+талия, день 3: верх). Мои цели: рост силы, контроль техники, профилактика травм.\n\n"
+        "(день 1: верх, день 2: ноги+талия, день 3: верх). Мои цели: рост силы, контроль техники, профилактика травм." + (" " + profile_str if profile_str else "") + "\n\n"
         "ПОСЛЕДНЯЯ ТРЕНИРОВКА (" + (last_date or "?") + ((" [" + str(last_dur_min) + " мин]") if last_dur_min else "") + ":\n" + last_summary + "\n\n"
         "ПРЕДЫДУЩАЯ ТРЕНИРОВКА ЭТОГО ДНЯ:\n" + prev_summary + "\n\n"
         "ТОННАЖ ПО НЕДЕЛЯМ (30 дней): " + weekly_summary + "\n"
