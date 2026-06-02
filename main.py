@@ -1203,8 +1203,9 @@ def load_demo():
     conn = get_db()
     cur = conn.cursor()
 
-    # Очищаем лог
-    cur.execute("DELETE FROM workout_log")
+    # Очищаем лог только для текущего пользователя
+    uid = current_user_id()
+    cur.execute("DELETE FROM workout_log WHERE user_id = ?", (uid,))
 
     # Генерируем 8 недель красивых данных с прогрессом
     from datetime import date, timedelta
@@ -1274,9 +1275,9 @@ def load_demo():
 
                 cur.execute("""
                     INSERT INTO workout_log
-                    (exercise_id, workout_date, set_number, weight, reps, difficulty)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (ex_id, workout_date.isoformat(), set_num, weight, reps, diff))
+                    (user_id, exercise_id, workout_date, set_number, weight, reps, difficulty)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (uid, ex_id, workout_date.isoformat(), set_num, weight, reps, diff))
 
     conn.commit()
     conn.close()
