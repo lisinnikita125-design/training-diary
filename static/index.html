@@ -21,6 +21,11 @@
             --green:#2ecc71; --gl:#0f2318; --gm:#1a3d28; --border:#2a2d3a;
             --shadow:0 2px 8px rgba(0,0,0,0.4);
         }
+        body.wc {
+            --bg:#f5f5f5; --card:#ffffff; --text:#1a1a1a; --text2:#666666;
+            --green:#e31e24; --gl:#fff0f0; --gm:#ffd6d6; --border:#e8e8e8;
+            --shadow:0 2px 8px rgba(0,0,0,0.08);
+        }
         body.light {
             --bg:#f5f7fa; --card:#ffffff; --text:#1a1a2e; --text2:#666880;
             --green:#27ae60; --gl:#f0fff5; --gm:#d5f5e3; --border:#e0e4ef;
@@ -559,6 +564,19 @@ let historyData = [];
 
 
 
+function updateLogoForTheme() {
+    const isDemo = document.body.classList.contains('wc');
+    const logoEl = document.querySelector('.top-bar [style*="border-radius:10px"]');
+    const nameEl = document.querySelector('.top-bar [style*="font-weight:800"]');
+    const subEl = document.querySelector('.top-bar [style*="letter-spacing:1px"]');
+    if (logoEl) {
+        logoEl.style.background = isDemo ? 'linear-gradient(135deg,#c01820,#e31e24)' : 'linear-gradient(135deg,#1a3d28,#2ecc71)';
+        logoEl.textContent = isDemo ? 'WC' : 'P';
+    }
+    if (nameEl) nameEl.textContent = isDemo ? 'Дневник тренировок' : 'Progressor';
+    if (subEl) subEl.textContent = isDemo ? 'WORLD CLASS' : 'Train smarter. Recover better.';
+}
+
 function showSettingsMenu() {
     const menu = document.getElementById('settingsMenu');
     menu.classList.toggle('hidden');
@@ -581,6 +599,10 @@ async function restoreMyData() {
         const resp = await fetch('/restore-backup', {method:'POST', headers:{'Content-Type':'application/json'}});
         const data = await resp.json();
         if (data.status === 'ok') {
+            // Возвращаем Progressor тему
+            document.body.classList.remove('wc');
+            localStorage.removeItem('demoMode');
+            updateLogoForTheme();
             showToast('✅ Данные восстановлены!');
         } else {
             showToast('Бэкап не найден — загрузи демо сначала', true);
@@ -598,6 +620,11 @@ async function loadDemoData() {
         const resp = await fetch('/load-demo', {method:'POST', headers:{'Content-Type':'application/json'}});
         const data = await resp.json();
         if (data.status === 'ok') {
+            // Переключаем на WC тему
+            document.body.classList.remove('light');
+            document.body.classList.add('wc');
+            localStorage.setItem('demoMode', '1');
+            updateLogoForTheme();
             showToast('✅ Демо-данные загружены! ' + data.workouts + ' тренировок');
         } else {
             showToast('Ошибка загрузки', true);
@@ -835,6 +862,7 @@ document.addEventListener('visibilitychange', () => {
 
 window.onload = async () => {
     if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');
+    if (localStorage.getItem('demoMode') === '1') { document.body.classList.add('wc'); setTimeout(updateLogoForTheme, 100); }
     await registerSW();
     const resp = await fetch('/check-auth');
     const data = await resp.json();
