@@ -1,11 +1,11 @@
 {
-  "name": "World Class — Тренировочный дневник",
-  "short_name": "WC Дневник",
-  "description": "Персональный тренировочный дневник с AI-тренером",
+  "name": "Progressor — AI-тренер",
+  "short_name": "Progressor",
+  "description": "Умный тренировочный дневник с AI-анализом и персональными рекомендациями",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#e31e24",
+  "background_color": "#0f1117",
+  "theme_color": "#2ecc71",
   "orientation": "portrait",
   "icons": [
     {
