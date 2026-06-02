@@ -309,6 +309,7 @@
         <button class="nav-tab" onclick="showTab('compare')">⚖️</button>
         <button class="nav-tab" onclick="showTab('stats')">📊</button>
         <button class="nav-tab" onclick="showTab('ai')">🤖</button>
+        <button class="nav-tab" onclick="showTab('myprogress')">🏆</button>
     </div>
 
     <!-- ═══ ТРЕНИРОВКА ═══ -->
@@ -565,6 +566,32 @@
                 <div id="aiHistoryList" style="display:flex;flex-direction:column;gap:8px;">
                     <div style="text-align:center;color:var(--text2);font-size:13px;padding:12px;">Нажми «Обновить» чтобы загрузить</div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ МОЙ ПРОГРЕСС ═══ -->
+    <div id="tab-myprogress" class="hidden">
+        <div class="section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h2 style="margin:0;">🏆 Мой прогресс</h2>
+                <button class="btn-primary btn-sm" onclick="loadProgressSummary()">🔍 Обновить</button>
+            </div>
+            <p style="font-size:13px;color:var(--text2);margin:0 0 16px 0;">AI-сводка прогресса за последние 8 недель на основе тренировок, веса тела и замеров.</p>
+
+            <div id="progressLoading" class="hidden" style="text-align:center;padding:24px;color:var(--text2);">
+                <div style="font-size:28px;margin-bottom:8px;">⏳</div>
+                <div>Анализирую прогресс...</div>
+            </div>
+
+            <div id="progressResult" class="hidden">
+                <div id="progressResultText" style="font-size:14px;line-height:1.7;color:var(--text);"></div>
+            </div>
+
+            <div id="progressEmpty" style="text-align:center;padding:32px;color:var(--text2);">
+                <div style="font-size:48px;margin-bottom:12px;">📈</div>
+                <div style="font-size:15px;font-weight:600;margin-bottom:8px;">Начни отслеживать прогресс</div>
+                <div style="font-size:13px;">Проведи несколько тренировок, добавь вес тела и замеры — AI покажет твой прогресс за 8 недель.</div>
             </div>
         </div>
     </div>
@@ -974,15 +1001,16 @@ function toggleHistory(idx) {
 
 function showTab(name) {
     document.getElementById('settingsMenu').classList.add('hidden');
-    ['workout','history','progress','compare','stats','ai'].forEach(t => {
+    ['workout','history','progress','compare','stats','ai','myprogress'].forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
     });
     document.querySelectorAll('.nav-tab').forEach((btn, i) => {
-        btn.classList.toggle('active', ['workout','history','progress','compare','stats','ai'][i] === name);
+        btn.classList.toggle('active', ['workout','history','progress','compare','stats','ai','myprogress'][i] === name);
     });
     if (name === 'stats') loadStats();
     if (name === 'compare') loadCompareDates();
     if (name === 'history') loadWorkoutHistory();
+    if (name === 'myprogress') loadProgressSummary();
 }
 
 // ══════════════════════════════════════════════
@@ -1960,6 +1988,33 @@ async function loadMeasurements() {
             </div>`;
         }).join('');
     } catch(e) {}
+}
+
+async function loadProgressSummary() {
+    const loading = document.getElementById('progressLoading');
+    const result = document.getElementById('progressResult');
+    const empty = document.getElementById('progressEmpty');
+    const text = document.getElementById('progressResultText');
+
+    loading.classList.remove('hidden');
+    result.classList.add('hidden');
+    empty.classList.add('hidden');
+
+    try {
+        const resp = await fetch('/progress-summary');
+        const data = await resp.json();
+        loading.classList.add('hidden');
+
+        if (data.status === 'ok') {
+            text.innerHTML = renderAIText(data.summary);
+            result.classList.remove('hidden');
+        } else {
+            empty.classList.remove('hidden');
+        }
+    } catch(e) {
+        loading.classList.add('hidden');
+        empty.classList.remove('hidden');
+    }
 }
 
 function copyAnalysis() {

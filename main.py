@@ -1356,6 +1356,172 @@ def ai_history():
     conn.close()
     return jsonify({"history": [dict(r) for r in rows]})
 
+
+@app.route("/progress-summary")
+def progress_summary():
+    require_auth()
+    uid = current_user_id()
+    conn = get_db()
+
+    # Даты — 8 недель назад
+    from datetime import date, timedelta
+    eight_weeks_ago = (date.today() - timedelta(weeks=8)).isoformat()
+
+    # Тренировки за 8 недель
+    workouts = conn.execute("""
+        SELECT COUNT(DISTINCT workout_date) as count,
+               SUM(weight * reps) as total_tonnage,
+               MAX(workout_date) as last_date,
+               MIN(workout_date) as first_date
+        FROM workout_log
+        WHERE user_id = ? AND set_number > 0 AND workout_date >= ?
+    """, (uid, eight_weeks_ago)).fetchone()
+
+    # Прирост по упражнениям
+    exercise_progress = conn.execute("""
+        SELECT e.name,
+               MIN(wl.weight) as start_weight,
+               MAX(wl.weight) as max_weight,
+               MAX(wl.weight) - MIN(wl.weight) as gain
+        FROM workout_log wl
+        JOIN exercises e ON e.id = wl.exercise_id
+        WHERE wl.user_id = ? AND wl.set_number > 0 AND wl.workout_date >= ?
+        GROUP BY e.name
+        HAVING COUNT(DISTINCT wl.workout_date) >= 2
+        ORDER BY gain DESC
+        LIMIT 5
+    """, (uid, eight_weeks_ago)).fetchall()
+
+    # Тоннаж первые 4 недели vs последние 4 недели
+    four_weeks_ago = (date.today() - timedelta(weeks=4)).isoformat()
+    tonnage_first = conn.execute("""
+        SELECT COALESCE(SUM(weight * reps), 0) as t FROM workout_log
+        WHERE user_id = ? AND set_number > 0
+        AND workout_date >= ? AND workout_date < ?
+    """, (uid, eight_weeks_ago, four_weeks_ago)).fetchone()["t"]
+    tonnage_last = conn.execute("""
+        SELECT COALESCE(SUM(weight * reps), 0) as t FROM workout_log
+        WHERE user_id = ? AND set_number > 0 AND workout_date >= ?
+    """, (uid, four_weeks_ago)).fetchone()["t"]
+
+    # Вес тела — первое и последнее значение
+    bw_first = conn.execute("""
+        SELECT weight_kg FROM body_weight WHERE user_id = ?
+        AND log_date >= ? ORDER BY log_date ASC LIMIT 1
+    """, (uid, eight_weeks_ago)).fetchone()
+    bw_last = conn.execute("""
+        SELECT weight_kg FROM body_weight WHERE user_id = ?
+        ORDER BY log_date DESC LIMIT 1
+    """, (uid,)).fetchone()
+
+    # Замеры — первые и последние
+    meas_first = conn.execute("""
+        SELECT * FROM body_measurements WHERE user_id = ?
+        AND log_date >= ? ORDER BY log_date ASC LIMIT 1
+    """, (uid, eight_weeks_ago)).fetchone()
+    meas_last = conn.execute("""
+        SELECT * FROM body_measurements WHERE user_id = ?
+        ORDER BY log_date DESC LIMIT 1
+    """, (uid,)).fetchone()
+
+    # Профиль
+    profile = conn.execute(
+        "SELECT age, gender, weight_kg, height_cm, goal FROM users WHERE id=?", (uid,)
+    ).fetchone()
+    conn.close()
+
+    # Формируем данные для AI
+    profile_str = ""
+    if profile:
+        if profile["age"]: profile_str += f"Возраст: {profile['age']} лет. "
+        if profile["gender"]: profile_str += f"Пол: {profile['gender']}. "
+        if profile["height_cm"]: profile_str += f"Рост: {profile['height_cm']} см. "
+        if profile["goal"]: profile_str += f"Цель: {profile['goal']}. "
+
+    bw_change = ""
+    if bw_first and bw_last:
+        diff = round(bw_last["weight_kg"] - bw_first["weight_kg"], 1)
+        sign = "+" if diff > 0 else ""
+        bw_change = f"Вес тела: {bw_first['weight_kg']} → {bw_last['weight_kg']} кг ({sign}{diff} кг). "
+
+    meas_change = ""
+    if meas_first and meas_last:
+        parts = []
+        for field, name in [("waist_cm","талия"), ("chest_cm","грудь"), ("bicep_cm","бицепс")]:
+            if meas_first[field] and meas_last[field]:
+                diff = round(meas_last[field] - meas_first[field], 1)
+                sign = "+" if diff > 0 else ""
+                parts.append(f"{name}: {sign}{diff} см")
+        if parts: meas_change = "Замеры: " + ", ".join(parts) + ". "
+
+    ex_str = ""
+    for r in exercise_progress:
+        if r["gain"] > 0:
+            ex_str += f"{r['name']}: +{r['gain']} кг. "
+
+    tonnage_change = ""
+    if tonnage_first > 0:
+        pct = round((tonnage_last - tonnage_first) / tonnage_first * 100)
+        sign = "+" if pct > 0 else ""
+        tonnage_change = f"Тоннаж: первые 4 нед {round(tonnage_first)} кг → последние 4 нед {round(tonnage_last)} кг ({sign}{pct}%). "
+
+    prompt = f"""Ты — AI-тренер приложения Progressor. Составь краткий отчёт о прогрессе пользователя за последние 8 недель.
+
+ПРОФИЛЬ: {profile_str}
+ТРЕНИРОВКИ: {workouts['count'] if workouts else 0} тренировок за 8 недель ({workouts['first_date'] if workouts else '?'} — {workouts['last_date'] if workouts else '?'}).
+{bw_change}{meas_change}{ex_str}{tonnage_change}
+
+Ответ строго в формате:
+
+**📊 Сводка прогресса за 8 недель**
+
+**Индекс прогресса: X/100**
+Одно предложение что означает этот индекс.
+
+**Ключевые достижения:**
+- 3-4 конкретных факта с цифрами
+
+**Состав тела:**
+- Изменение веса и замеров с интерпретацией
+
+**Силовой прогресс:**
+- Топ-3 упражнения с приростом
+
+**Тоннаж:**
+- Динамика за период
+
+**Вывод AI:**
+Один абзац — стал ли пользователь лучше, что работает, что требует внимания.
+
+ВАЖНО: только факты из данных. Без слов "возможно", "может быть". Все цифры из данных."""
+
+    try:
+        import urllib.request, json as _json
+        payload = _json.dumps({
+            "modelUri": f"gpt://{YANDEX_FOLDER_ID}/yandexgpt",
+            "completionOptions": {"stream": False, "temperature": 0.4, "maxTokens": 1500},
+            "messages": [{"role": "user", "text": prompt}]
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": "Api-Key " + YANDEX_API_KEY,
+                "x-folder-id": YANDEX_FOLDER_ID
+            }
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = _json.loads(resp.read().decode("utf-8"))
+            answer = result["result"]["alternatives"][0]["message"]["text"]
+            return jsonify({"status": "ok", "summary": answer, "data": {
+                "workouts": workouts["count"] if workouts else 0,
+                "bw_change": bw_change,
+                "tonnage_change": tonnage_change
+            }})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # ══════════════════════════════════════════════
 #  ДЕМО-РЕЖИМ
 # ══════════════════════════════════════════════
