@@ -153,6 +153,7 @@ def login():
 
     session["auth"] = True
     session["user_id"] = user["id"]
+    session["user_name"] = user["name"] or email
     return jsonify({"status": "ok", "name": user["name"] or email})
 
 
@@ -1013,6 +1014,7 @@ def ai_analyze():
             rec_short = rec["recommendation_text"][:800]
             memory_block += f"Дата тренировки {rec['workout_date']}:\n{rec_short}\n---\n"
         memory_block += "Учти: выполнил ли пользователь прошлые рекомендации по весам — сравни с ПОСЛЕДНЕЙ ТРЕНИРОВКОЙ.\n"
+    conn2.close()
 
     # Получаем профиль для AI
     conn2 = get_db()
@@ -1395,7 +1397,7 @@ def workout_history():
         # Получаем упражнения за этот день
         sets = cur.execute("""
             SELECT e.name, wl.set_number, wl.weight, wl.reps, wl.difficulty,
-                   SUM(wl.weight * wl.reps) OVER (PARTITION BY e.name) as ex_tonnage,
+                   0 as ex_tonnage,
                    (SELECT MAX(duration_seconds) FROM workout_log
                     WHERE workout_date = ? AND (user_id = ? OR user_id IS NULL)) as duration_seconds
             FROM workout_log wl

@@ -831,6 +831,7 @@ window.onload = async () => {
         const ws = document.getElementById('welcomeScreen');
         if (ws) ws.style.display = 'none';
         fillExerciseSelect();
+        checkAdminAccess();
         // Проверяем напоминание при входе
         const rem = await fetch('/check-reminder').then(r=>r.json()).catch(()=>({}));
         if (rem.days_since >= 3) maybeNotify(rem.days_since);
@@ -1806,22 +1807,7 @@ async function loadStats() {
             options:{responsive:true, plugins:{legend:{display:false}, title:{display:true, text:'Тоннаж по неделям'}}, scales:{y:{beginAtZero:true}}}
         });
     }
-    // Личные рекорды
-    try {
-        const rec = await (await fetch('/personal-records')).json();
-        const grid = document.getElementById('recordsGrid');
-        grid.innerHTML = '';
-        rec.records.forEach(r => {
-            const card = document.createElement('div');
-            card.style.cssText = 'background:#fff0f0;border-radius:8px;padding:10px 12px;border:1px solid #ffd6d6;';
-            card.innerHTML = `
-                <div style="font-size:12px;color:var(--text2);margin-bottom:2px;">${r.name}</div>
-                <div style="font-size:20px;font-weight:700;color:var(--green);">${r.max_weight} кг</div>
-                <div style="font-size:11px;color:var(--text2);">${r.workout_date}</div>
-            `;
-            grid.appendChild(card);
-        });
-    } catch(e) {}
+
 }
 
 async function showProfile() {
