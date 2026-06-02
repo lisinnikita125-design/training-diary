@@ -340,7 +340,7 @@ def get_profile():
     require_auth()
     conn = get_db()
     user = conn.execute(
-        "SELECT email, name, age, gender, weight_kg, goal, created_at FROM users WHERE id = ?",
+        "SELECT email, name, age, gender, weight_kg, height_cm, goal, created_at FROM users WHERE id = ?",
         (current_user_id(),)
     ).fetchone()
     conn.close()
@@ -352,8 +352,8 @@ def update_profile():
     data = request.get_json() or {}
     conn = get_db()
     conn.execute(
-        "UPDATE users SET name=?, age=?, gender=?, weight_kg=?, goal=? WHERE id=?",
-        (data.get("name"), data.get("age"), data.get("gender"), data.get("weight_kg"), data.get("goal"), current_user_id())
+        "UPDATE users SET name=?, age=?, gender=?, weight_kg=?, height_cm=?, goal=? WHERE id=?",
+        (data.get("name"), data.get("age"), data.get("gender"), data.get("weight_kg"), data.get("height_cm"), data.get("goal"), current_user_id())
     )
     conn.commit()
     conn.close()
@@ -1067,13 +1067,14 @@ def ai_analyze():
 
     # Получаем профиль для AI
     conn2 = get_db()
-    profile = conn2.execute("SELECT age, gender, weight_kg, goal FROM users WHERE id=?", (uid,)).fetchone()
+    profile = conn2.execute("SELECT age, gender, weight_kg, height_cm, goal FROM users WHERE id=?", (uid,)).fetchone()
     conn2.close()
     profile_str = ""
     if profile:
         if profile["age"]: profile_str += f"Возраст: {profile['age']} лет. "
         if profile["gender"]: profile_str += f"Пол: {profile['gender']}. "
         if profile["weight_kg"]: profile_str += f"Вес тела: {profile['weight_kg']} кг. "
+        if profile.get("height_cm"): profile_str += f"Рост: {profile['height_cm']} см. "
         if profile.get("goal"): profile_str += f"Цель: {profile['goal']}. "
 
     # Динамика веса тела
