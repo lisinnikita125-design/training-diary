@@ -6,24 +6,24 @@
     <link rel="manifest" href="/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="WC Дневник">
+    <meta name="apple-mobile-web-app-title" content="Progressor">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="/icon-192.png">
-    <meta name="theme-color" content="#e31e24">
+    <meta name="theme-color" content="#0f1117">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <title>World Class — Тренировочный дневник</title>
+    <title>Progressor — AI-тренер</title>
     <style>
         * { box-sizing: border-box; }
         :root {
-            --bg:#f5f5f5; --card:#ffffff; --text:#1a1a1a; --text2:#666666;
-            --green:#e31e24; --gl:#fff0f0; --gm:#ffd6d6; --border:#e8e8e8;
-            --shadow:0 2px 8px rgba(0,0,0,0.08);
+            --bg:#0f1117; --card:#1a1d26; --text:#e8eaf0; --text2:#8b92a8;
+            --green:#2ecc71; --gl:#0f2318; --gm:#1a3d28; --border:#2a2d3a;
+            --shadow:0 2px 8px rgba(0,0,0,0.4);
         }
-        body.dark {
-            --bg:#1a0000; --card:#230000; --text:#f0d0d0; --text2:#a07070;
-            --green:#ff3333; --gl:#2a0000; --gm:#3d0000; --border:#3d0000;
-            --shadow:0 2px 8px rgba(0,0,0,0.5);
+        body.light {
+            --bg:#f5f7fa; --card:#ffffff; --text:#1a1a2e; --text2:#666880;
+            --green:#27ae60; --gl:#f0fff5; --gm:#d5f5e3; --border:#e0e4ef;
+            --shadow:0 2px 8px rgba(0,0,0,0.08);
         }
         body { font-family:'Inter','Helvetica Neue',Arial,sans-serif; max-width:860px; margin:0 auto; padding:12px; background:var(--bg); color:var(--text); transition:background .2s,color .2s; }
 
@@ -49,7 +49,7 @@
         select { flex:1; min-width:180px; padding:10px 12px; font-size:15px; border:1.5px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); appearance:none; -webkit-appearance:none; }
         select:focus { outline:none; border-color:var(--green); }
         button { padding:10px 16px; font-size:15px; font-weight:600; border:none; border-radius:8px; cursor:pointer; transition:opacity .15s; }
-        .btn-primary { background:linear-gradient(135deg,#c01820,#e31e24); color:white; box-shadow:0 2px 8px rgba(227,30,36,0.35); }
+        .btn-primary { background:linear-gradient(135deg,#1a8a4a,#2ecc71); color:white; box-shadow:0 2px 8px rgba(46,204,113,0.35); }
         .btn-primary:hover { opacity:.88; }
         .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
         .btn-secondary { background:var(--gl); color:var(--green); }
@@ -209,7 +209,7 @@
         /* Навигация */
         .nav-tabs { display:flex; gap:0; background:var(--card); border-radius:10px; padding:4px; margin-bottom:14px; box-shadow:var(--shadow); }
         .nav-tab { flex:1; padding:8px; font-size:13px; font-weight:600; border:none; border-radius:7px; background:none; color:var(--text2); cursor:pointer; }
-        .nav-tab.active { background:linear-gradient(135deg,#c01820,#e31e24); color:white; box-shadow:0 2px 8px rgba(227,30,36,0.3); }
+        .nav-tab.active { background:linear-gradient(135deg,#1a8a4a,#2ecc71); color:white; box-shadow:0 2px 8px rgba(46,204,113,0.3); }
     </style>
 </head>
 <body>
@@ -221,7 +221,7 @@
 
 <!-- ═══════════ ЭКРАН ВХОДА ═══════════ -->
 <div id="loginScreen">
-    <h2>💪 Тренировочный дневник</h2>
+    <h2>⚡ Progressor</h2>
     <div class="auth-box" id="boxLogin">
         <h3>Вход</h3>
         <input type="email" id="loginEmail" placeholder="Email" onkeydown="if(event.key==='Enter')doLogin()">
@@ -253,10 +253,10 @@
 <div id="app" class="hidden">
     <div class="top-bar">
         <div style="display:flex;align-items:center;gap:10px;">
-            <div style="width:36px;height:36px;background:#e31e24;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:white;letter-spacing:-1px;flex-shrink:0;">WC</div>
+            <div style="width:36px;height:36px;background:linear-gradient(135deg,#1a3d28,#2ecc71);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:white;flex-shrink:0;">P</div>
             <div style="display:flex;flex-direction:column;line-height:1.2;">
-                <span style="font-size:10px;font-weight:600;color:var(--text2);letter-spacing:2px;text-transform:uppercase;">WORLD CLASS</span>
-                <span style="font-size:16px;font-weight:800;color:var(--green);letter-spacing:-0.3px;">Дневник тренировок</span>
+                <span style="font-size:16px;font-weight:800;color:var(--green);letter-spacing:-0.3px;">Progressor</span>
+                <span style="font-size:10px;font-weight:500;color:var(--text2);letter-spacing:1px;">Train smarter. Recover better.</span>
             </div>
         </div>
         <div style="display:flex;gap:6px;">
@@ -833,7 +833,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 window.onload = async () => {
-    if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark');
+    if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');
     await registerSW();
     const resp = await fetch('/check-auth');
     const data = await resp.json();
@@ -854,8 +854,8 @@ window.onload = async () => {
 //  ТЕМА
 // ══════════════════════════════════════════════
 function toggleTheme() {
-    document.body.classList.toggle('dark');
-    localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+    document.body.classList.toggle('light');
+    localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
 }
 
 // ══════════════════════════════════════════════
