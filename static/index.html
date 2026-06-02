@@ -1802,8 +1802,18 @@ async function loadStats() {
     document.getElementById('statTonnage').textContent = (data.month_tonnage/1000).toFixed(1);
     if (data.weekly?.length > 0) {
         if (weeklyChartInstance) weeklyChartInstance.destroy();
+        function weekLabel(w) {
+            const [year, week] = w.split('-').map(Number);
+            const jan4 = new Date(year, 0, 4);
+            const startOfWeek = new Date(jan4);
+            startOfWeek.setDate(jan4.getDate() - jan4.getDay() + 1 + (week - 1) * 7);
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            const fmt = d => d.getDate() + ' ' + ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()];
+            return fmt(startOfWeek) + '–' + fmt(endOfWeek);
+        }
         weeklyChartInstance = new Chart(document.getElementById('weeklyChart').getContext('2d'), {
-            type:'bar', data:{labels:data.weekly.map(w=>w.week), datasets:[{label:'Тоннаж (кг)', data:data.weekly.map(w=>w.tonnage), backgroundColor:'rgba(46,125,50,0.7)', borderRadius:6}]},
+            type:'bar', data:{labels:data.weekly.map(w=>weekLabel(w.week)), datasets:[{label:'Тоннаж (кг)', data:data.weekly.map(w=>w.tonnage), backgroundColor:'rgba(46,125,50,0.7)', borderRadius:6}]},
             options:{responsive:true, plugins:{legend:{display:false}, title:{display:true, text:'Тоннаж по неделям'}}, scales:{y:{beginAtZero:true}}}
         });
     }
