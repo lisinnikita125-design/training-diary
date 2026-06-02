@@ -1825,7 +1825,7 @@ async function loadAIHistory() {
         container.innerHTML = data.history.map((rec, idx) => {
             const text = rec.recommendation_text || '';
             // Извлекаем индекс готовности
-            const readinessMatch = text.match(/готовность\s+(\d+(?:\.\d+)?\/10)/i);
+            const readinessMatch = text.match(/готовность (\d+(?:\.\d+)?\/10)/i);
             const readiness = readinessMatch ? readinessMatch[1] : null;
             // Извлекаем вердикт
             const verdictMatch = text.match(/Вердикт[:\s]+([^
