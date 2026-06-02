@@ -315,7 +315,7 @@ def admin_users():
     require_admin()
     conn = get_db()
     users = conn.execute("""
-        SELECT u.id, u.email, u.name, u.age, u.gender, u.is_verified, u.created_at,
+        SELECT u.id, u.email, u.name, u.age, u.gender, u.is_admin, u.is_verified, u.created_at,
                COUNT(DISTINCT wl.workout_date) as workout_count
         FROM users u
         LEFT JOIN workout_log wl ON wl.user_id = u.id AND wl.set_number > 0
