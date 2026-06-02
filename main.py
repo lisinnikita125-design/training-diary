@@ -411,6 +411,42 @@ def save_body_weight():
     conn.close()
     return jsonify({"status": "ok"})
 
+
+@app.route("/measurements", methods=["GET"])
+def get_measurements():
+    require_auth()
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT log_date, chest_cm, waist_cm, hips_cm, shoulder_cm, bicep_cm, notes
+        FROM body_measurements
+        WHERE user_id = ? ORDER BY log_date DESC LIMIT 20
+    """, (current_user_id(),)).fetchall()
+    conn.close()
+    return jsonify({"history": [dict(r) for r in rows]})
+
+@app.route("/measurements", methods=["POST"])
+def save_measurements():
+    require_auth()
+    data = request.get_json() or {}
+    date = data.get("date", datetime.now().strftime("%Y-%m-%d"))
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO body_measurements (user_id, log_date, chest_cm, waist_cm, hips_cm, shoulder_cm, bicep_cm, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id, log_date) DO UPDATE SET
+            chest_cm = excluded.chest_cm,
+            waist_cm = excluded.waist_cm,
+            hips_cm = excluded.hips_cm,
+            shoulder_cm = excluded.shoulder_cm,
+            bicep_cm = excluded.bicep_cm,
+            notes = excluded.notes
+    """, (current_user_id(), date,
+          data.get("chest_cm"), data.get("waist_cm"), data.get("hips_cm"),
+          data.get("shoulder_cm"), data.get("bicep_cm"), data.get("notes")))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
 # ══════════════════════════════════════════════
 #  ДНИ И УПРАЖНЕНИЯ
 # ══════════════════════════════════════════════
@@ -1087,6 +1123,23 @@ def ai_analyze():
     if bw_rows:
         bw_str = ", ".join([f"{r['log_date']}: {r['weight_kg']} кг" for r in reversed(bw_rows)])
         profile_str += f"Динамика веса: {bw_str}. "
+
+    # Последние замеры тела
+    conn4 = get_db()
+    meas = conn4.execute("""
+        SELECT log_date, chest_cm, waist_cm, hips_cm, bicep_cm
+        FROM body_measurements WHERE user_id = ?
+        ORDER BY log_date DESC LIMIT 2
+    """, (uid,)).fetchall()
+    conn4.close()
+    if meas:
+        last = meas[0]
+        meas_str = f"Последние замеры ({last['log_date']}): "
+        if last['chest_cm']: meas_str += f"грудь {last['chest_cm']} см, "
+        if last['waist_cm']: meas_str += f"талия {last['waist_cm']} см, "
+        if last['hips_cm']: meas_str += f"бёдра {last['hips_cm']} см, "
+        if last['bicep_cm']: meas_str += f"бицепс {last['bicep_cm']} см. "
+        profile_str += meas_str
 
     prompt = (
         "Ты — персональный AI-тренер и спортивный врач. Тренируюсь 3 раза в неделю "

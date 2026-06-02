@@ -456,6 +456,25 @@
                 <canvas id="bodyWeightChart" height="120" style="margin-bottom:8px;"></canvas>
             </div>
 
+            <!-- Замеры тела -->
+            <div style="margin-top:20px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:13px;font-weight:600;color:var(--text2);">📏 Замеры тела (см)</span>
+                    <button class="btn-secondary btn-sm" onclick="toggleMeasurementsForm()">+ Добавить</button>
+                </div>
+                <div id="measurementsForm" class="hidden" style="background:var(--card);border-radius:10px;padding:12px;margin-bottom:10px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                        <input type="number" id="mChest" step="0.1" placeholder="Грудь" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
+                        <input type="number" id="mWaist" step="0.1" placeholder="Талия" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
+                        <input type="number" id="mHips" step="0.1" placeholder="Бёдра" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
+                        <input type="number" id="mShoulder" step="0.1" placeholder="Плечо" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
+                        <input type="number" id="mBicep" step="0.1" placeholder="Бицепс" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
+                    </div>
+                    <button class="btn-primary btn-sm" style="width:100%;" onclick="saveMeasurements()">💾 Сохранить замеры</button>
+                </div>
+                <div id="measurementsList" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+
             <!-- Recovery история -->
             <div style="margin-top:20px;" id="recoverySection">
                 <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:8px;">🩺 История самочувствия</div>
@@ -1877,6 +1896,60 @@ async function loadBodyWeight() {
     } catch(e) {}
 }
 
+function toggleMeasurementsForm() {
+    const el = document.getElementById('measurementsForm');
+    if (el) el.classList.toggle('hidden');
+}
+
+async function saveMeasurements() {
+    const body = {
+        date: new Date().toISOString().split('T')[0],
+        chest_cm: parseFloat(document.getElementById('mChest').value) || null,
+        waist_cm: parseFloat(document.getElementById('mWaist').value) || null,
+        hips_cm: parseFloat(document.getElementById('mHips').value) || null,
+        shoulder_cm: parseFloat(document.getElementById('mShoulder').value) || null,
+        bicep_cm: parseFloat(document.getElementById('mBicep').value) || null
+    };
+    if (!body.chest_cm && !body.waist_cm && !body.hips_cm && !body.shoulder_cm && !body.bicep_cm) {
+        showToast('Заполни хотя бы одно поле', true); return;
+    }
+    const resp = await fetch('/measurements', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    });
+    if (resp.ok) {
+        showToast('✅ Замеры сохранены');
+        ['mChest','mWaist','mHips','mShoulder','mBicep'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('measurementsForm').classList.add('hidden');
+        loadMeasurements();
+    } else { showToast('Ошибка', true); }
+}
+
+async function loadMeasurements() {
+    try {
+        const data = await fetch('/measurements').then(r => r.json());
+        const list = document.getElementById('measurementsList');
+        if (!list) return;
+        if (!data.history || data.history.length === 0) {
+            list.innerHTML = '<div style="font-size:13px;color:var(--text2);">Замеров пока нет</div>';
+            return;
+        }
+        list.innerHTML = data.history.map(r => {
+            const parts = [];
+            if (r.chest_cm) parts.push('Грудь: ' + r.chest_cm);
+            if (r.waist_cm) parts.push('Талия: ' + r.waist_cm);
+            if (r.hips_cm) parts.push('Бёдра: ' + r.hips_cm);
+            if (r.shoulder_cm) parts.push('Плечо: ' + r.shoulder_cm);
+            if (r.bicep_cm) parts.push('Бицепс: ' + r.bicep_cm);
+            return `<div style="background:var(--card);border-radius:8px;padding:10px 12px;">
+                <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">📅 ${r.log_date}</div>
+                <div style="font-size:13px;color:var(--text);">${parts.join(' · ')} см</div>
+            </div>`;
+        }).join('');
+    } catch(e) {}
+}
+
 function copyAnalysis() {
     const text = document.getElementById('aiResultText').textContent;
     navigator.clipboard.writeText(text).then(() => showToast('✅ Скопировано'));
@@ -1891,6 +1964,7 @@ async function loadStats() {
     renderCalendar();
     loadRecoveryHistory();
     loadBodyWeight();
+    loadMeasurements();
     document.getElementById('statTotal').textContent = data.total_workouts;
     document.getElementById('statMonth').textContent = data.this_month;
     document.getElementById('statStreak').textContent = data.streak_weeks;
