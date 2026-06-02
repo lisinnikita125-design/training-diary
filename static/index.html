@@ -435,6 +435,18 @@
                 <div class="stat-card"><span class="val" id="statTonnage">—</span><span class="lbl">Тоннаж за месяц (т)</span></div>
             </div>
             
+            <!-- Вес тела -->
+            <div style="margin-top:20px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:13px;font-weight:600;color:var(--text2);">⚖️ Вес тела</span>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                    <input type="number" id="bwInput" step="0.1" placeholder="Вес (кг)" style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);font-size:14px;">
+                    <button class="btn-primary btn-sm" onclick="saveBodyWeight()">Сохранить</button>
+                </div>
+                <canvas id="bodyWeightChart" height="120" style="margin-bottom:8px;"></canvas>
+            </div>
+
             <!-- Recovery история -->
             <div style="margin-top:20px;" id="recoverySection">
                 <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:8px;">🩺 История самочувствия</div>
@@ -1783,6 +1795,56 @@ function toggleAIHistory(idx) {
     if (el) el.classList.toggle('hidden');
 }
 
+let bodyWeightChartInstance = null;
+
+async function saveBodyWeight() {
+    const val = parseFloat(document.getElementById('bwInput').value);
+    if (!val || val <= 0) { showToast('Введи вес', true); return; }
+    const resp = await fetch('/body-weight', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({weight_kg: val, date: new Date().toISOString().split('T')[0]})
+    });
+    if (resp.ok) {
+        showToast('✅ Вес сохранён');
+        document.getElementById('bwInput').value = '';
+        loadBodyWeight();
+    } else { showToast('Ошибка', true); }
+}
+
+async function loadBodyWeight() {
+    try {
+        const data = await fetch('/body-weight').then(r => r.json());
+        if (!data.history || data.history.length === 0) return;
+        const canvas = document.getElementById('bodyWeightChart');
+        if (!canvas) return;
+        const labels = data.history.map(r => r.log_date).reverse();
+        const values = data.history.map(r => r.weight_kg).reverse();
+        if (bodyWeightChartInstance) bodyWeightChartInstance.destroy();
+        bodyWeightChartInstance = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Вес (кг)',
+                    data: values,
+                    borderColor: '#e31e24',
+                    backgroundColor: 'rgba(227,30,36,0.1)',
+                    tension: 0.3,
+                    pointRadius: 5,
+                    pointBackgroundColor: '#e31e24',
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: false } }
+            }
+        });
+    } catch(e) {}
+}
+
 function copyAnalysis() {
     const text = document.getElementById('aiResultText').textContent;
     navigator.clipboard.writeText(text).then(() => showToast('✅ Скопировано'));
@@ -1796,6 +1858,7 @@ async function loadStats() {
     checkReminder();
     renderCalendar();
     loadRecoveryHistory();
+    loadBodyWeight();
     document.getElementById('statTotal').textContent = data.total_workouts;
     document.getElementById('statMonth').textContent = data.this_month;
     document.getElementById('statStreak').textContent = data.streak_weeks;
@@ -1829,6 +1892,7 @@ async function showProfile() {
     document.getElementById('profileAge').value = d.age || '';
     document.getElementById('profileGender').value = d.gender || '';
     document.getElementById('profileWeight').value = d.weight_kg || '';
+    document.getElementById('profileGoal').value = d.goal || '';
     document.getElementById('profileMsg').textContent = '';
     document.getElementById('profileModal').style.display='flex';
 }
@@ -1842,7 +1906,8 @@ async function saveProfile() {
             name: document.getElementById('profileName').value.trim(),
             age: parseInt(document.getElementById('profileAge').value) || null,
             gender: document.getElementById('profileGender').value || null,
-            weight_kg: parseFloat(document.getElementById('profileWeight').value) || null
+            weight_kg: parseFloat(document.getElementById('profileWeight').value) || null,
+            goal: document.getElementById('profileGoal').value || null
         })
     });
     msg.style.color = '#2e7d32';
@@ -1929,6 +1994,13 @@ async function checkAdminAccess() {
             </select>
         </div>
         <input id="profileWeight" type="number" step="0.1" placeholder="Вес тела (кг)" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
+        <select id="profileGoal" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
+            <option value="">Цель тренировок</option>
+            <option value="похудение">🔥 Похудение</option>
+            <option value="набор массы">💪 Набор массы</option>
+            <option value="поддержание формы">⚖️ Поддержание формы</option>
+            <option value="рост силы">📈 Рост силы</option>
+        </select>
         <button class="btn-primary" onclick="saveProfile()">💾 Сохранить</button>
         <hr style="border:none;border-top:1px solid var(--border);margin:4px 0;">
         <h4 style="margin:0;color:var(--text)">🔒 Сменить пароль</h4>

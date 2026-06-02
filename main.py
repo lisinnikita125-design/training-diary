@@ -340,7 +340,7 @@ def get_profile():
     require_auth()
     conn = get_db()
     user = conn.execute(
-        "SELECT email, name, age, gender, weight_kg, created_at FROM users WHERE id = ?",
+        "SELECT email, name, age, gender, weight_kg, goal, created_at FROM users WHERE id = ?",
         (current_user_id(),)
     ).fetchone()
     conn.close()
@@ -352,8 +352,8 @@ def update_profile():
     data = request.get_json() or {}
     conn = get_db()
     conn.execute(
-        "UPDATE users SET name=?, age=?, gender=?, weight_kg=? WHERE id=?",
-        (data.get("name"), data.get("age"), data.get("gender"), data.get("weight_kg"), current_user_id())
+        "UPDATE users SET name=?, age=?, gender=?, weight_kg=?, goal=? WHERE id=?",
+        (data.get("name"), data.get("age"), data.get("gender"), data.get("weight_kg"), data.get("goal"), current_user_id())
     )
     conn.commit()
     conn.close()
@@ -378,6 +378,38 @@ def change_password():
     conn.commit()
     conn.close()
     return jsonify({"status": "ok", "message": "Пароль изменён"})
+
+
+@app.route("/body-weight", methods=["GET"])
+def get_body_weight():
+    require_auth()
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT log_date, weight_kg, notes FROM body_weight
+        WHERE user_id = ? ORDER BY log_date DESC LIMIT 30
+    """, (current_user_id(),)).fetchall()
+    conn.close()
+    return jsonify({"history": [dict(r) for r in rows]})
+
+@app.route("/body-weight", methods=["POST"])
+def save_body_weight():
+    require_auth()
+    data = request.get_json() or {}
+    weight = data.get("weight_kg")
+    if not weight or float(weight) <= 0:
+        return jsonify({"status": "error", "message": "Неверный вес"}), 400
+    date = data.get("date", datetime.now().strftime("%Y-%m-%d"))
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO body_weight (user_id, log_date, weight_kg, notes)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_id, log_date) DO UPDATE SET
+            weight_kg = excluded.weight_kg,
+            notes = excluded.notes
+    """, (current_user_id(), date, float(weight), data.get("notes")))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
 
 # ══════════════════════════════════════════════
 #  ДНИ И УПРАЖНЕНИЯ
@@ -1035,13 +1067,25 @@ def ai_analyze():
 
     # Получаем профиль для AI
     conn2 = get_db()
-    profile = conn2.execute("SELECT age, gender, weight_kg FROM users WHERE id=?", (uid,)).fetchone()
+    profile = conn2.execute("SELECT age, gender, weight_kg, goal FROM users WHERE id=?", (uid,)).fetchone()
     conn2.close()
     profile_str = ""
     if profile:
         if profile["age"]: profile_str += f"Возраст: {profile['age']} лет. "
         if profile["gender"]: profile_str += f"Пол: {profile['gender']}. "
         if profile["weight_kg"]: profile_str += f"Вес тела: {profile['weight_kg']} кг. "
+        if profile.get("goal"): profile_str += f"Цель: {profile['goal']}. "
+
+    # Динамика веса тела
+    conn3 = get_db()
+    bw_rows = conn3.execute("""
+        SELECT log_date, weight_kg FROM body_weight
+        WHERE user_id = ? ORDER BY log_date DESC LIMIT 5
+    """, (uid,)).fetchall()
+    conn3.close()
+    if bw_rows:
+        bw_str = ", ".join([f"{r['log_date']}: {r['weight_kg']} кг" for r in reversed(bw_rows)])
+        profile_str += f"Динамика веса: {bw_str}. "
 
     prompt = (
         "Ты — персональный AI-тренер и спортивный врач. Тренируюсь 3 раза в неделю "

@@ -103,7 +103,21 @@ def init_db():
 
     # Добавляем user_id в workout_log если его ещё нет (миграция)
     # Добавляем поля профиля если нет
-    for col, typ in [("age", "INTEGER"), ("gender", "TEXT"), ("weight_kg", "REAL")]:
+    # Таблица веса тела
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS body_weight (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            log_date TEXT NOT NULL,
+            weight_kg REAL NOT NULL,
+            notes TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_body_weight_user_date ON body_weight(user_id, log_date)")
+
+    for col, typ in [("age", "INTEGER"), ("gender", "TEXT"), ("weight_kg", "REAL"), ("goal", "TEXT")]:
         try:
             cur.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
         except Exception:
