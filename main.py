@@ -32,6 +32,29 @@ except Exception:
 
 init_db()
 
+def send_telegram(message):
+    """Отправляет сообщение об ошибке в Telegram."""
+    try:
+        import config as _cfg
+        token = getattr(_cfg, 'TELEGRAM_TOKEN', '')
+        chat_id = getattr(_cfg, 'TELEGRAM_CHAT_ID', '')
+        if not token or not chat_id:
+            return
+        import urllib.request, json as _json
+        payload = _json.dumps({
+            "chat_id": chat_id,
+            "text": message,
+            "parse_mode": "HTML"
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
+
 
 def migrate_existing_data():
     """Привязывает существующие данные (user_id IS NULL) к первому пользователю."""
@@ -1228,6 +1251,7 @@ def ai_analyze():
             return jsonify({"status": "ok", "analysis": answer})
 
     except Exception as e:
+        send_telegram(f"🔴 <b>Progressor AI Error</b>\n{str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
@@ -1520,6 +1544,7 @@ def progress_summary():
                 "tonnage_change": tonnage_change
             }})
     except Exception as e:
+        send_telegram(f"🔴 <b>Progressor Summary Error</b>\n{str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ══════════════════════════════════════════════
@@ -1711,3 +1736,15 @@ def workout_history():
 
     conn.close()
     return jsonify({"history": result})
+
+@app.errorhandler(500)
+def handle_500(e):
+    send_telegram(f"🔴 <b>Progressor 500</b>\n{str(e)}")
+    return jsonify({"status": "error", "message": "Внутренняя ошибка"}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    if hasattr(e, 'code') and e.code < 500:
+        return e
+    send_telegram(f"🔴 <b>Progressor Exception</b>\n{type(e).__name__}: {str(e)}")
+    return jsonify({"status": "error", "message": str(e)}), 500
