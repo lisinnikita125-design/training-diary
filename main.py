@@ -302,6 +302,23 @@ def admin_users():
     conn.close()
     return jsonify({"users": [dict(u) for u in users]})
 
+
+@app.route("/admin/toggle-admin/<int:user_id>", methods=["POST"])
+def admin_toggle_admin(user_id):
+    require_admin()
+    if user_id == current_user_id():
+        return jsonify({"status": "error", "message": "Нельзя изменить свои права"}), 400
+    conn = get_db()
+    user = conn.execute("SELECT is_admin FROM users WHERE id=?", (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
+    new_val = 0 if user["is_admin"] else 1
+    conn.execute("UPDATE users SET is_admin=? WHERE id=?", (new_val, user_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok", "is_admin": new_val})
+
 @app.route("/admin/delete-user/<int:user_id>", methods=["DELETE"])
 def admin_delete_user(user_id):
     require_admin()

@@ -1876,9 +1876,16 @@ async function showAdmin() {
                 <div style="font-size:12px;color:var(--text2)">${u.email}</div>
                 <div style="font-size:11px;color:var(--text2)">тренировок: ${u.workout_count} · ${(u.created_at||'').slice(0,10)}</div>
             </div>
-            ${u.is_admin ? '' : '<button onclick="deleteUser(' + u.id + ',\'' + u.email + '\')" style="background:#c62828;color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;">🗑</button>'}
+            ${u.is_admin ? '<button onclick="toggleAdmin(' + u.id + ')" style="background:var(--gl);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;">👑 Снять</button>' : '<div style=\"display:flex;gap:6px;\"><button onclick=\"toggleAdmin(' + u.id + ')\" style=\"background:var(--gl);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;\">👑 Назначить</button><button onclick=\"deleteUser(' + u.id + ',\\\'' + u.email + '\\\')\" style=\"background:#c62828;color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;\">🗑</button></div>'}
         </div>
     `).join('');
+}
+
+async function toggleAdmin(id) {
+    const resp = await fetch('/admin/toggle-admin/' + id, {method: 'POST'});
+    const d = await resp.json();
+    if (resp.ok) showAdmin();
+    else alert(d.message);
 }
 
 async function deleteUser(id, email) {
