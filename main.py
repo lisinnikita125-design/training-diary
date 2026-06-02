@@ -1335,7 +1335,7 @@ def workout_history():
             WHERE wl.workout_date = ? AND e.day_id = ? AND wl.set_number > 0
               AND (wl.user_id = ? OR wl.user_id IS NULL)
             ORDER BY e.sort_order, wl.set_number
-        """, (d["workout_date"], d["day_id"], uid)).fetchall()
+        """, (d["workout_date"], uid, d["workout_date"], d["day_id"], uid)).fetchall()
 
         total_tonnage = sum(r["weight"] * r["reps"] for r in sets)
 
