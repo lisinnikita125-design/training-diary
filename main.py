@@ -1074,8 +1074,8 @@ def ai_analyze():
         if profile["age"]: profile_str += f"Возраст: {profile['age']} лет. "
         if profile["gender"]: profile_str += f"Пол: {profile['gender']}. "
         if profile["weight_kg"]: profile_str += f"Вес тела: {profile['weight_kg']} кг. "
-        if profile.get("height_cm"): profile_str += f"Рост: {profile['height_cm']} см. "
-        if profile.get("goal"): profile_str += f"Цель: {profile['goal']}. "
+        if profile["height_cm"]: profile_str += f"Рост: {profile['height_cm']} см. "
+        if profile["goal"]: profile_str += f"Цель: {profile['goal']}. "
 
     # Динамика веса тела
     conn3 = get_db()
