@@ -68,7 +68,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS recovery_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
-            log_date TEXT NOT NULL UNIQUE,
+            log_date TEXT NOT NULL,
             sleep INTEGER,
             energy INTEGER,
             stress INTEGER,
@@ -82,6 +82,7 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_workout_user_date ON workout_log(user_id, workout_date)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_workout_exercise ON workout_log(exercise_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_recovery_user ON recovery_log(user_id)")
+    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_recovery_user_date ON recovery_log(user_id, log_date)")
 
     # Добавляем duration_seconds если нет
     try:

@@ -153,7 +153,6 @@ def login():
 
     session["auth"] = True
     session["user_id"] = user["id"]
-    session["user_name"] = user["name"] or email
     return jsonify({"status": "ok", "name": user["name"] or email})
 
 
@@ -795,6 +794,7 @@ def personal_records():
 @app.route("/progress-by-name-grouped")
 def get_progress_grouped():
     """История подходов сгруппированная по датам."""
+    require_auth()
     name = request.args.get("name", "").strip()
     if not name:
         abort(400, description="Параметр name обязателен")
@@ -1080,12 +1080,11 @@ def save_recovery():
     cur.execute("""
         INSERT INTO recovery_log (user_id, log_date, sleep, energy, stress, notes)
         VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(log_date) DO UPDATE SET
+        ON CONFLICT(user_id, log_date) DO UPDATE SET
             sleep = excluded.sleep,
             energy = excluded.energy,
             stress = excluded.stress,
-            notes = excluded.notes,
-            user_id = excluded.user_id
+            notes = excluded.notes
     """, (uid, date, data.get("sleep"), data.get("energy"), data.get("stress"), data.get("notes")))
     conn.commit()
     conn.close()
@@ -1152,7 +1151,8 @@ def check_pr():
             FROM workout_log wl
             JOIN exercises e ON e.id = wl.exercise_id
             WHERE e.name = ? AND wl.workout_date < ? AND wl.set_number > 0
-        """, (r["name"], date)).fetchone()
+              AND (wl.user_id = ? OR wl.user_id IS NULL)
+        """, (r["name"], date, uid)).fetchone()
 
         if prev and prev["prev_max_weight"]:
             if r["max_weight"] > prev["prev_max_weight"]:
@@ -1252,7 +1252,7 @@ def load_demo():
     day2_exercises = [
         (8, [30, 32.5, 35, 37.5]),      # Разгибание ног
         (9, [25, 27.5, 30, 32.5]),      # Сгибание ног
-        (41, [60, 65, 70, 75]),         # Жим ногами
+        ("Горизонтальный жим ногами", [60, 65, 70, 75]),  # Жим ногами
         (10, [30, 32.5, 35, 35]),       # Приводящая
         (11, [35, 37.5, 40, 40]),       # Отводящая
     ]
@@ -1277,8 +1277,11 @@ def load_demo():
         progress = (week_num // 2) * 2.5
 
         for ex_id, base_weights in exercises:
-            # Получаем plan_sets
-            ex = cur.execute("SELECT plan_sets FROM exercises WHERE id=?", (ex_id,)).fetchone()
+            if isinstance(ex_id, str):
+                ex = cur.execute("SELECT id, plan_sets FROM exercises WHERE name=?", (ex_id,)).fetchone()
+                if ex: ex_id = ex["id"]
+            else:
+                ex = cur.execute("SELECT id, plan_sets FROM exercises WHERE id=?", (ex_id,)).fetchone()
             if not ex:
                 continue
             plan_sets = ex["plan_sets"]
