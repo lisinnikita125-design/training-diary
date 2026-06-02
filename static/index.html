@@ -1705,6 +1705,7 @@ async function checkPR(date) {
     } catch(e) {}
 }
 
+let prBannerTimer = null;
 function showPRBanner(prs) {
     const banner = document.getElementById('prBanner');
     const lines = prs.map(pr => {
@@ -1716,9 +1717,12 @@ function showPRBanner(prs) {
     });
     banner.innerHTML = '🎉 НОВЫЙ РЕКОРД!<br><span style="font-size:13px;font-weight:500;">' + lines.join('<br>') + '</span>';
     banner.classList.add('show');
-    // Вибрация
     if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
-    setTimeout(() => banner.classList.remove('show'), 5000);
+    if (prBannerTimer) clearTimeout(prBannerTimer);
+    prBannerTimer = setTimeout(() => {
+        banner.classList.remove('show');
+        prBannerTimer = null;
+    }, 5000);
 }
 
 // ══════════════════════════════════════════════
@@ -2126,7 +2130,7 @@ async function showAdmin() {
                 <div style="font-size:12px;color:var(--text2)">${u.email}</div>
                 <div style="font-size:11px;color:var(--text2)">тренировок: ${u.workout_count} · ${(u.created_at||'').slice(0,10)}</div>
             </div>
-            ${u.is_admin == 1 ? '<button onclick="toggleAdmin(' + u.id + ')" style="background:var(--gl);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;">👑 Снять</button>' : '<div style=\"display:flex;gap:6px;\"><button onclick=\"toggleAdmin(' + u.id + ')\" style=\"background:var(--gl);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;\">👑 Назначить</button><button onclick=\"deleteUser(' + u.id + ',\\\'' + u.email + '\\\')\" style=\"background:#c62828;color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;\">🗑</button></div>'}
+            ${(u.is_admin === 1 || u.is_admin === true) ? '<button onclick="toggleAdmin(' + u.id + ')" style="background:var(--gl);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;">👑 Снять</button>' : '<div style=\"display:flex;gap:6px;\"><button onclick=\"toggleAdmin(' + u.id + ')\" style=\"background:var(--gl);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;\">👑 Назначить</button><button onclick=\"deleteUser(' + u.id + ',\\\'' + u.email + '\\\')\" style=\"background:#c62828;color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;\">🗑</button></div>'}
         </div>
     `).join('');
 }
