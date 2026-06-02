@@ -1829,7 +1829,6 @@ async function loadAIHistory() {
             const readiness = readinessMatch ? readinessMatch[1] : null;
             // Извлекаем вердикт
             const verdictMatch = text.match(/Вердикт[: ]+([^.]+)/i);
-.]+)/i);
             const verdict = verdictMatch ? verdictMatch[1].trim() : null;
             // Цвет индекса
             const score = readiness ? parseFloat(readiness) : 0;
