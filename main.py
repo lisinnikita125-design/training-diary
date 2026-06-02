@@ -130,7 +130,7 @@ def register():
     send_email(email, "Подтверди email — Progressor", f"""
     <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;background:#0f1117;border-radius:16px;overflow:hidden;">
         <div style="background:linear-gradient(135deg,#1a3d28,#2ecc71);padding:32px;text-align:center;">
-            <div style="width:56px;height:56px;background:rgba(255,255,255,0.2);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:white;margin-bottom:12px;">P</div>
+            <img src="https://nikitalisin.pythonanywhere.com/static/icon-192.png" width="64" height="64" style="border-radius:14px;margin-bottom:12px;" />
             <h1 style="color:white;margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px;">Progressor</h1>
             <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:13px;">Train smarter. Recover better.</p>
         </div>
