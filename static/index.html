@@ -515,6 +515,18 @@
                 <div id="aiResultText" style="font-size:14px;line-height:1.7;color:var(--text);"></div>
             </div>
         </div>
+
+            <!-- История AI анализов -->
+            <div style="margin-top:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-size:13px;font-weight:600;color:var(--text2);">📜 История анализов</span>
+                    <button class="btn-secondary btn-sm" onclick="loadAIHistory()">Обновить</button>
+                </div>
+                <div id="aiHistoryList" style="display:flex;flex-direction:column;gap:8px;">
+                    <div style="text-align:center;color:var(--text2);font-size:13px;padding:12px;">Нажми «Обновить» чтобы загрузить</div>
+                </div>
+            </div>
+        </div>
     </div>
 
 </div>
@@ -1735,6 +1747,39 @@ async function runAnalysis() {
         loading.classList.add('hidden');
         showToast('Ошибка соединения с AI', true);
     }
+}
+
+async function loadAIHistory() {
+    const container = document.getElementById('aiHistoryList');
+    container.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:13px;padding:12px;">Загрузка...</div>';
+    try {
+        const data = await fetch('/ai-history').then(r => r.json());
+        if (!data.history || data.history.length === 0) {
+            container.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:13px;padding:12px;">История пуста</div>';
+            return;
+        }
+        container.innerHTML = data.history.map((rec, idx) => `
+            <div style="background:var(--card);border-radius:10px;box-shadow:var(--shadow);overflow:hidden;">
+                <div onclick="toggleAIHistory(${idx})" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;">
+                    <div>
+                        <div style="font-weight:600;font-size:14px;color:var(--text)">📅 ${rec.workout_date}</div>
+                        <div style="font-size:11px;color:var(--text2);">${rec.created_at ? rec.created_at.slice(0,16) : ''}</div>
+                    </div>
+                    <span style="color:var(--text2);font-size:18px;">›</span>
+                </div>
+                <div id="ai-hist-${idx}" class="hidden" style="border-top:1px solid var(--border);padding:14px;">
+                    <div style="font-size:13px;line-height:1.7;color:var(--text);">${renderAIText(rec.recommendation_text)}</div>
+                </div>
+            </div>
+        `).join('');
+    } catch(e) {
+        container.innerHTML = '<div style="text-align:center;color:#c62828;font-size:13px;padding:12px;">Ошибка загрузки</div>';
+    }
+}
+
+function toggleAIHistory(idx) {
+    const el = document.getElementById('ai-hist-' + idx);
+    if (el) el.classList.toggle('hidden');
 }
 
 function copyAnalysis() {

@@ -1224,6 +1224,21 @@ def check_pr():
     return jsonify({"prs": prs})
 
 
+
+@app.route("/ai-history")
+def ai_history():
+    require_auth()
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT id, workout_date, recommendation_text, created_at
+        FROM ai_recommendations
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 5
+    """, (current_user_id(),)).fetchall()
+    conn.close()
+    return jsonify({"history": [dict(r) for r in rows]})
+
 # ══════════════════════════════════════════════
 #  ДЕМО-РЕЖИМ
 # ══════════════════════════════════════════════
