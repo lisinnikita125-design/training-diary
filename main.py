@@ -997,6 +997,23 @@ def ai_analyze():
             + ("Стресс: " + str(stress) + "/5\n" if stress else "")
         )
 
+    # Загружаем прошлые рекомендации
+    conn2 = get_db()
+    past_recs = conn2.execute("""
+        SELECT workout_date, recommendation_text FROM ai_recommendations
+        WHERE user_id = ? ORDER BY created_at DESC LIMIT 2
+    """, (uid,)).fetchall()
+
+    # Формируем блок памяти для промпта
+    memory_block = ""
+    if past_recs:
+        memory_block = "\nПРОШЛЫЕ РЕКОМЕНДАЦИИ AI:\n"
+        for rec in reversed(past_recs):
+            # Берём только таблицу весов из прошлого ответа (первые 800 символов)
+            rec_short = rec["recommendation_text"][:800]
+            memory_block += f"Дата тренировки {rec['workout_date']}:\n{rec_short}\n---\n"
+        memory_block += "Учти: выполнил ли пользователь прошлые рекомендации по весам — сравни с ПОСЛЕДНЕЙ ТРЕНИРОВКОЙ.\n"
+
     # Получаем профиль для AI
     conn2 = get_db()
     profile = conn2.execute("SELECT age, gender, weight_kg FROM users WHERE id=?", (uid,)).fetchone()
@@ -1012,7 +1029,8 @@ def ai_analyze():
         "(день 1: верх, день 2: ноги+талия, день 3: верх). Цели: рост силы, контроль техники, профилактика травм.\n"
         + ("ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ: " + profile_str + "\n" if profile_str else "")
         + "\n"
-        "ПОСЛЕДНЯЯ ТРЕНИРОВКА (" + (last_date or "?") + ((" [" + str(last_dur_min) + " мин]") if last_dur_min else "") + ":\n" + last_summary + "\n\n"
+        + memory_block
+        + "ПОСЛЕДНЯЯ ТРЕНИРОВКА (" + (last_date or "?") + ((" [" + str(last_dur_min) + " мин]") if last_dur_min else "") + ":\n" + last_summary + "\n\n"
         "ПРЕДЫДУЩАЯ ТРЕНИРОВКА ЭТОГО ДНЯ:\n" + prev_summary + "\n\n"
         "ТОННАЖ ПО НЕДЕЛЯМ (30 дней): " + weekly_summary + "\n"
         "ЛИЧНЫЕ РЕКОРДЫ: " + records_summary +
@@ -1062,7 +1080,7 @@ def ai_analyze():
             "completionOptions": {
                 "stream": False,
                 "temperature": 0.5,
-                "maxTokens": 1500
+                "maxTokens": 2000
             },
             "messages": [{"role": "user", "text": prompt}]
         }).encode("utf-8")
@@ -1079,6 +1097,17 @@ def ai_analyze():
         with urllib.request.urlopen(req, timeout=30) as resp:
             result = _json.loads(resp.read().decode("utf-8"))
             answer = result["result"]["alternatives"][0]["message"]["text"]
+            # Сохраняем рекомендацию в историю
+            try:
+                conn3 = get_db()
+                conn3.execute(
+                    "INSERT INTO ai_recommendations (user_id, workout_date, recommendation_text) VALUES (?, ?, ?)",
+                    (uid, last_date or datetime.now().strftime("%Y-%m-%d"), answer)
+                )
+                conn3.commit()
+                conn3.close()
+            except Exception:
+                pass
             return jsonify({"status": "ok", "analysis": answer})
 
     except Exception as e:

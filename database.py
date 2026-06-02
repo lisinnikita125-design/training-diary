@@ -79,6 +79,17 @@ def init_db():
     """)
 
     # Индексы для производительности
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS ai_recommendations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            workout_date TEXT NOT NULL,
+            recommendation_text TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_rec_user ON ai_recommendations(user_id, workout_date)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_workout_user_date ON workout_log(user_id, workout_date)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_workout_exercise ON workout_log(exercise_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_recovery_user ON recovery_log(user_id)")
