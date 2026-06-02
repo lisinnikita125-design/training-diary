@@ -1179,15 +1179,35 @@ def check_pr():
 # ══════════════════════════════════════════════
 @app.route("/restore-backup", methods=["POST"])
 def restore_backup():
-    """Восстанавливает данные из последнего бэкапа до демо."""
+    """Восстанавливает workout_log пользователя из бэкапа до демо."""
     require_auth()
-    backup_dir = "backups"
-    # Ищем бэкап с суффиксом _pre_demo
-    pre_demo = os.path.join(backup_dir, "training_pre_demo.db")
-    if os.path.exists(pre_demo):
-        shutil.copy2(pre_demo, "training.db")
+    uid = current_user_id()
+    pre_demo = os.path.join("backups", "training_pre_demo.db")
+    if not os.path.exists(pre_demo):
+        return jsonify({"status": "error", "message": "Бэкап до демо не найден"}), 404
+    try:
+        import sqlite3 as _sqlite3
+        backup_conn = _sqlite3.connect(pre_demo)
+        backup_conn.row_factory = _sqlite3.Row
+        rows = backup_conn.execute(
+            "SELECT * FROM workout_log WHERE user_id = ? OR user_id IS NULL", (uid,)
+        ).fetchall()
+        backup_conn.close()
+        conn = get_db()
+        conn.execute("DELETE FROM workout_log WHERE user_id = ?", (uid,))
+        for r in rows:
+            conn.execute("""
+                INSERT INTO workout_log
+                (user_id, exercise_id, workout_date, set_number, weight, reps, difficulty, notes, duration_seconds)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (uid, r["exercise_id"], r["workout_date"], r["set_number"],
+                  r["weight"], r["reps"], r["difficulty"], r["notes"],
+                  r["duration_seconds"] if "duration_seconds" in r.keys() else None))
+        conn.commit()
+        conn.close()
         return jsonify({"status": "ok", "message": "Данные восстановлены"})
-    return jsonify({"status": "error", "message": "Бэкап до демо не найден"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route("/load-demo", methods=["POST"])
