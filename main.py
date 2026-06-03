@@ -1535,10 +1535,13 @@ def progress_summary():
             ex_str += f"{r['name']}: +{r['gain']} кг. "
 
     tonnage_change = ""
-    if tonnage_first > 0:
-        pct = round((tonnage_last - tonnage_first) / tonnage_first * 100)
-        sign = "+" if pct > 0 else ""
-        tonnage_change = f"Тоннаж: первые 4 нед {round(tonnage_first)} кг → последние 4 нед {round(tonnage_last)} кг ({sign}{pct}%). "
+    if tonnage_last > 0:
+        if tonnage_first > 0:
+            pct = round((tonnage_last - tonnage_first) / tonnage_first * 100)
+            sign = "+" if pct > 0 else ""
+            tonnage_change = f"Тоннаж: первые 4 нед {round(tonnage_first)} кг → последние 4 нед {round(tonnage_last)} кг ({sign}{pct}%). "
+        else:
+            tonnage_change = f"Тоннаж за последние 4 недели: {round(tonnage_last)} кг (данные за первые 4 нед отсутствуют). "
 
     prompt = f"""Ты — AI-тренер приложения Progressor. Составь краткий отчёт о прогрессе пользователя за последние 8 недель.
 
