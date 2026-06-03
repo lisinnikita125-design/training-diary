@@ -1440,6 +1440,17 @@ def progress_summary():
     require_auth()
     uid = current_user_id()
     conn = get_db()
+    # Проверяем кэш
+    cache = conn.execute(
+        "SELECT summary_text, last_workout_date FROM progress_summary_cache WHERE user_id=?", (uid,)
+    ).fetchone()
+    last_workout = conn.execute(
+        "SELECT MAX(workout_date) as d FROM workout_log WHERE user_id=? AND set_number>0", (uid,)
+    ).fetchone()
+    last_date = last_workout["d"] if last_workout else None
+    if cache and cache["last_workout_date"] == last_date:
+        conn.close()
+        return jsonify({"status": "ok", "summary": cache["summary_text"], "cached": True})
 
     # Даты — 8 недель назад
     from datetime import date, timedelta
@@ -1595,7 +1606,15 @@ def progress_summary():
         with urllib.request.urlopen(req, timeout=30) as resp:
             result = _json.loads(resp.read().decode("utf-8"))
             answer = result["result"]["alternatives"][0]["message"]["text"]
-            return jsonify({"status": "ok", "summary": answer, "data": {
+            # Сохраняем в кэш
+            cache_conn = get_db()
+            cache_conn.execute(
+                "INSERT OR REPLACE INTO progress_summary_cache (user_id, summary_text, last_workout_date) VALUES (?, ?, ?)",
+                (uid, answer, last_date)
+            )
+            cache_conn.commit()
+            cache_conn.close()
+            return jsonify({"status": "ok", "summary": answer, "cached": False, "data": {
                 "workouts": workouts["count"] if workouts else 0,
                 "bw_change": bw_change,
                 "tonnage_change": tonnage_change

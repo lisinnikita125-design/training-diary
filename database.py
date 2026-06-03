@@ -151,6 +151,16 @@ def init_db():
     except Exception:
         pass
 
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS progress_summary_cache (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL UNIQUE,
+            summary_text TEXT NOT NULL,
+            generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_workout_date TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
     conn.commit()
     conn.close()
 
