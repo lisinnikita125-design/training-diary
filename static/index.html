@@ -1430,7 +1430,7 @@ function renderHistoryGrouped(grouped) {
     grouped.forEach(group => {
         // Заголовок даты
         const dateRow = document.createElement('tr');
-        dateRow.innerHTML = `<td colspan="6" style="background:var(--gl);font-weight:700;color:var(--green);font-size:13px;padding:6px 8px;text-align:left;">📅 ${group.date}</td>`;
+        dateRow.innerHTML = `<td colspan="6" style="background:var(--gl);font-weight:700;color:var(--green);font-size:13px;padding:6px 8px;text-align:left;">📅 ${group.date}<button onclick="deleteWorkoutByDate('${group.date}')" style="float:right;background:none;border:none;cursor:pointer;font-size:13px;color:#e31e24;padding:0 4px;" title="Удалить тренировку">🗑️</button></td>`;
         tbody.appendChild(dateRow);
         // Подходы
         group.sets.forEach(entry => {
@@ -1442,6 +1442,22 @@ function renderHistoryGrouped(grouped) {
         });
     });
 }
+async function deleteWorkoutByDate(date) {
+    if (!confirm(`Удалить тренировку за ${date}? Это действие нельзя отменить.`)) return;
+    const resp = await fetch("/delete-workout", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({workout_date: date})});
+    if (resp.ok) {
+        showToast("✅ Тренировка удалена");
+        const exName = document.getElementById("exerciseSelect").value;
+        if (exName) {
+            currentStats = await (await fetch(`/workout-stats?name=${encodeURIComponent(exName)}`)).json();
+            drawChart(currentChartMode);
+            const hist = await (await fetch(`/workout-history?name=${encodeURIComponent(exName)}`)).json();
+            historyData = hist.history || [];
+            renderHistoryTable(historyData);
+        }
+    } else { showToast("Ошибка удаления", true); }
+}
+
 function editHistoryRow(idx) {
     const e = historyData[idx];
     const row = document.getElementById(`hist-row-${idx}`);

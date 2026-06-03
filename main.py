@@ -737,6 +737,20 @@ def edit_log():
     return jsonify({"status": "ok"})
 
 
+@app.route("/delete-workout", methods=["POST"])
+def delete_workout():
+    require_auth()
+    data = request.get_json()
+    if not data or "workout_date" not in data:
+        abort(400, description="Нет даты")
+    uid = current_user_id()
+    conn = get_db()
+    conn.execute("DELETE FROM workout_log WHERE user_id = ? AND workout_date = ?", (uid, data["workout_date"]))
+    conn.commit()
+    conn.close()
+    logger.info(f"WORKOUT_DELETED user_id={uid} date={data['workout_date']}")
+    return jsonify({"status": "ok"})
+
 @app.route("/exercise/<int:exercise_id>", methods=["PUT"])
 def update_exercise(exercise_id):
     require_auth()
