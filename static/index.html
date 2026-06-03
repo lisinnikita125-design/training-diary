@@ -1796,7 +1796,7 @@ function renderAIText(text) {
         if (line.trim().startsWith('|') && i + 1 < lines.length && lines[i+1].replace(/[-|: ]/g,'').trim() === '') {
             // Это таблица
             const headerCells = line.split('|').map(c => c.trim()).filter(Boolean);
-            let t = '<div style="overflow-x:auto;margin:10px 0;"><table style="width:100%;border-collapse:collapse;font-size:13px;">';
+            let t = '<div style="overflow-x:auto;margin:10px 0;"><table style="width:100%;border-collapse:collapse;font-size:15px;">';
             t += '<thead><tr>' + headerCells.map(h => '<th style="background:#e31e24;color:white;padding:8px 10px;text-align:left;white-space:nowrap;">' + h + '</th>').join('') + '</tr></thead><tbody>';
             i += 2; // пропускаем заголовок и разделитель
             let rowIdx = 0;
@@ -1891,11 +1891,11 @@ async function loadAIHistory() {
                         <div style="font-weight:700;font-size:14px;color:var(--text)">📅 ${rec.workout_date}</div>
                         ${readiness ? `<div style="background:${color};color:white;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;">⚡ ${readiness}</div>` : ''}
                     </div>
-                    <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">${rec.created_at ? rec.created_at.slice(0,16) : ''}</div>
-                    ${verdict ? `<div style="font-size:12px;color:var(--text2);font-style:italic;">🎯 ${verdict}</div>` : ''}
+                    <div style="font-size:13px;color:var(--text2);margin-bottom:4px;">${rec.created_at ? rec.created_at.slice(0,16) : ''}</div>
+                    ${verdict ? `<div style="font-size:14px;color:var(--text2);font-style:italic;">🎯 ${verdict}</div>` : ''}
                 </div>
                 <div id="ai-hist-${idx}" class="hidden" style="border-top:1px solid var(--border);padding:14px;">
-                    <div style="font-size:13px;line-height:1.7;color:var(--text);">${renderAIText(text)}</div>
+                    <div style="font-size:15px;line-height:1.8;color:var(--text);">${renderAIText(text)}</div>
                 </div>
             </div>`;
         }).join('');
