@@ -32,6 +32,26 @@ except Exception:
 
 init_db()
 
+import logging
+from logging.handlers import RotatingFileHandler
+
+log_handler = RotatingFileHandler(
+    '/home/NikitaLisin/logs/app.log',
+    maxBytes=1024*1024,  # 1MB
+    backupCount=5,
+    encoding='utf-8'
+)
+log_handler.setFormatter(logging.Formatter(
+    '%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+))
+logger = logging.getLogger('progressor')
+logger.setLevel(logging.INFO)
+logger.addHandler(log_handler)
+
+import os
+os.makedirs('/home/NikitaLisin/logs', exist_ok=True)
+
 def send_telegram(message):
     """Отправляет сообщение об ошибке в Telegram."""
     try:
@@ -187,6 +207,7 @@ def login():
     session["auth"] = True
     session["user_id"] = user["id"]
     session["user_name"] = user["name"] or email
+    logger.info(f"LOGIN user_id={user['id']} email={email}")
     return jsonify({"status": "ok", "name": user["name"] or email})
 
 
@@ -558,6 +579,7 @@ def log_workout():
         backup_db()
     except Exception:
         pass
+    logger.info(f"WORKOUT_SAVED user_id={current_user_id()} date={data['date']} day={data['day_id']}")
     return jsonify({"status": "ok", "date": data["date"], "day_id": data["day_id"]})
 
 
@@ -1264,6 +1286,7 @@ def ai_analyze():
                 conn3.close()
             except Exception:
                 pass
+            logger.info(f"AI_ANALYZE user_id={uid} date={last_date}")
             return jsonify({"status": "ok", "analysis": answer})
 
     except Exception as e:
@@ -1788,6 +1811,7 @@ def workout_history():
 
 @app.errorhandler(500)
 def handle_500(e):
+    logger.error(f"500 ERROR: {str(e)}")
     send_telegram(f"🔴 <b>Progressor 500</b>\n{str(e)}")
     return jsonify({"status": "error", "message": "Внутренняя ошибка"}), 500
 
