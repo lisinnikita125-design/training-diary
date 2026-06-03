@@ -565,6 +565,9 @@ def log_workout():
 
         for s in ex_log["sets"]:
             weight = s.get("weight") if s.get("weight") is not None else exercise["default_weight"]
+            if s["reps"] < 0 or weight < 0:
+                conn.close()
+                abort(400, description="Вес и повторения не могут быть отрицательными")
             cur.execute("""
                 INSERT INTO workout_log (user_id, exercise_id, workout_date, set_number, weight, reps, difficulty, notes, duration_seconds)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

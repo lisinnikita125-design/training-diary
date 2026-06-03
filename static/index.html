@@ -1371,7 +1371,10 @@ async function saveWorkout() {
         const sets = [];
         for (let i = 0; i < Math.min(planSets, ws.length); i++) {
             const reps = parseInt(rs[i].value)||0;
-            if (reps > 0) sets.push({set_number:i+1, weight:parseFloat(ws[i].value)||0, reps, difficulty:diff?.value||null, notes:note||null});
+            const weight = parseFloat(ws[i].value)||0;
+            if (reps < 0 || weight < 0) { showToast('Вес и повторения не могут быть отрицательными', true); saveButton.disabled = false; saveButton.textContent = '💾 Сохранить'; isSaving = false; return; }
+            if (reps > 0 && weight > 0) sets.push({set_number:i+1, weight, reps, difficulty:diff?.value||null, notes:note||null});
+            else if (reps > 0 && weight === 0) sets.push({set_number:i+1, weight:0, reps, difficulty:diff?.value||null, notes:note||null});
         }
         if (sets.length > 0) exercises.push({exercise_id:parseInt(exId), sets});
     });
