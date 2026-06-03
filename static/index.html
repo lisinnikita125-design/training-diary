@@ -468,8 +468,8 @@
                         <input type="number" id="mChest" step="0.1" placeholder="Грудь" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
                         <input type="number" id="mWaist" step="0.1" placeholder="Талия" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
                         <input type="number" id="mHips" step="0.1" placeholder="Бёдра" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
-                        <input type="number" id="mShoulder" step="0.1" placeholder="Плечо" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
-                        <input type="number" id="mBicep" step="0.1" placeholder="Бицепс" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
+                        <input type="number" id="mShoulder" step="0.1" placeholder="Обхват плеча" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
+                        <input type="number" id="mBicep" step="0.1" placeholder="Бицепс (напряж.)" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:13px;">
                     </div>
                     <button class="btn-primary btn-sm" style="width:100%;" onclick="saveMeasurements()">💾 Сохранить замеры</button>
                 </div>
@@ -2003,8 +2003,8 @@ async function loadMeasurements() {
             if (r.chest_cm) parts.push('Грудь: ' + r.chest_cm);
             if (r.waist_cm) parts.push('Талия: ' + r.waist_cm);
             if (r.hips_cm) parts.push('Бёдра: ' + r.hips_cm);
-            if (r.shoulder_cm) parts.push('Плечо: ' + r.shoulder_cm);
-            if (r.bicep_cm) parts.push('Бицепс: ' + r.bicep_cm);
+            if (r.shoulder_cm) parts.push('Плечо: ' + r.shoulder_cm + ' см');
+            if (r.bicep_cm) parts.push('Бицепс: ' + r.bicep_cm + ' см');
             return `<div style="background:var(--card);border-radius:8px;padding:10px 12px;">
                 <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">📅 ${r.log_date}</div>
                 <div style="font-size:13px;color:var(--text);">${parts.join(' · ')} см</div>
