@@ -1667,6 +1667,7 @@ def restore_backup():
         conn.close()
         return jsonify({"status": "ok", "message": "Данные восстановлены"})
     except Exception as e:
+        logger.error(f"RESTORE_ERROR user_id={current_user_id()} {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
