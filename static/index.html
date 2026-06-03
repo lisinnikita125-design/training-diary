@@ -2120,7 +2120,8 @@ function adminButtons(u) {
     const isAdmin = u.is_admin === 1 || u.is_admin === true;
     const toggleBtn = '<button onclick="toggleAdmin(' + u.id + ')" style="background:var(--gl);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;">👑 ' + (isAdmin ? 'Снять' : 'Назначить') + '</button>';
     const deleteBtn = '<button onclick="deleteUser(' + u.id + ',\'' + u.email + '\')" style="background:#c62828;color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;">🗑</button>';
-    return isAdmin ? toggleBtn : '<div style="display:flex;gap:6px;">' + toggleBtn + deleteBtn + '</div>';
+    const verifyBtn = u.is_verified ? '' : '<button onclick="verifyUser(' + u.id + ')" style="background:#1a3d28;color:#2ecc71;border:1px solid #2ecc71;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;">✅ Верифицировать</button>';
+    return isAdmin ? toggleBtn : '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + toggleBtn + verifyBtn + deleteBtn + '</div>';
 }
 
 async function showAdmin() {
@@ -2140,6 +2141,28 @@ async function showAdmin() {
             ${adminButtons(u)}
         </div>
     `).join('');
+}
+
+async function deleteOwnAccount() {
+    if (!confirm('Удалить аккаунт? Все данные будут удалены безвозвратно.')) return;
+    if (!confirm('Вы уверены? Это действие нельзя отменить.')) return;
+    const resp = await fetch('/delete-account', {method: 'POST'});
+    const d = await resp.json();
+    if (resp.ok) {
+        document.getElementById('profileModal').style.display = 'none';
+        document.getElementById('app').classList.add('hidden');
+        document.getElementById('loginScreen').classList.remove('hidden');
+        showToast('Аккаунт удалён');
+    } else {
+        alert(d.message);
+    }
+}
+
+async function verifyUser(id) {
+    const resp = await fetch('/admin/verify-user/' + id, {method: 'POST'});
+    const d = await resp.json();
+    if (resp.ok) { showToast('✅ Пользователь верифицирован'); showAdmin(); }
+    else alert(d.message);
 }
 
 async function toggleAdmin(id) {
@@ -2198,6 +2221,8 @@ async function checkAdminAccess() {
         <button class="btn-secondary" onclick="changePassword()">Изменить пароль</button>
         <span id="profileMsg" style="font-size:13px;text-align:center;min-height:16px;"></span>
         <button class="btn-secondary" onclick="document.getElementById('profileModal').style.display='none'">✕ Закрыть</button>
+        <hr style="border:none;border-top:1px solid var(--border);margin:4px 0;">
+        <button onclick="deleteOwnAccount()" style="width:100%;padding:10px;background:none;border:1.5px solid #c62828;border-radius:8px;color:#c62828;cursor:pointer;font-size:14px;font-weight:600;">🗑 Удалить аккаунт</button>
     </div>
 </div>
 <div id="adminModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto;padding:20px;">

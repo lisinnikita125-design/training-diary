@@ -1563,6 +1563,39 @@ def progress_summary():
         send_telegram(f"🔴 <b>Progressor Summary Error</b>\n{str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
+@app.route("/admin/verify-user/<int:user_id>", methods=["POST"])
+def admin_verify_user(user_id):
+    require_admin()
+    conn = get_db()
+    conn.execute("UPDATE users SET is_verified=1, verify_token=NULL WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/delete-account", methods=["POST"])
+def delete_account():
+    require_auth()
+    uid = current_user_id()
+    conn = get_db()
+    # Проверяем что не единственный админ
+    admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE is_admin=1").fetchone()[0]
+    is_admin = conn.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()["is_admin"]
+    if is_admin and admin_count <= 1:
+        conn.close()
+        return jsonify({"status": "error", "message": "Нельзя удалить единственного администратора"}), 400
+    conn.execute("DELETE FROM workout_log WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM recovery_log WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM body_weight WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM body_measurements WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM ai_recommendations WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM users WHERE id=?", (uid,))
+    conn.commit()
+    conn.close()
+    session.clear()
+    return jsonify({"status": "ok"})
+
 # ══════════════════════════════════════════════
 #  ДЕМО-РЕЖИМ
 # ══════════════════════════════════════════════
