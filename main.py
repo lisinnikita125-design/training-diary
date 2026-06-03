@@ -285,6 +285,12 @@ def reset_password():
 def require_auth():
     if not session.get("auth"):
         abort(401, description="Не авторизован")
+    conn = get_db()
+    user = conn.execute("SELECT id FROM users WHERE id=?", (session.get("user_id"),)).fetchone()
+    conn.close()
+    if not user:
+        session.clear()
+        abort(401, description="Пользователь не найден")
 
 
 def current_user_id():
