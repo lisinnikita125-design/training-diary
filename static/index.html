@@ -909,6 +909,12 @@ document.addEventListener('visibilitychange', () => {
     }
 });
 
+window.addEventListener('unhandledrejection', function(e) {
+    if (e.reason && e.reason.name === 'AbortError') return;
+    console.error('Unhandled fetch error:', e.reason);
+    showToast('Ошибка соединения с сервером', true);
+});
+
 window.onload = async () => {
     if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');
     if (localStorage.getItem('demoMode') === '1') { document.body.classList.add('wc'); setTimeout(updateLogoForTheme, 100); }
