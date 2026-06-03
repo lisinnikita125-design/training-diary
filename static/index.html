@@ -1349,7 +1349,10 @@ function confirmSave() {
     const date = new Date().toLocaleDateString('ru-RU');
     if (confirm(`Сохранить тренировку за ${date}?\n\nЕсли уже сохраняли сегодня — старые данные заменятся.`)) saveWorkout();
 }
+let isSaving = false;
 async function saveWorkout() {
+    if (isSaving) return;
+    isSaving = true;
     const saveButton = document.getElementById('saveButton');
     saveButton.disabled = true; saveButton.textContent = 'Сохраняю...';
     const dayId = document.getElementById('daySelect').value;
@@ -1395,7 +1398,7 @@ async function saveWorkout() {
             setTimeout(() => closeWorkout(), 1500);
         } else { showToast('Ошибка сохранения', true); }
     } catch(e) { showToast('Ошибка сети', true); }
-    finally { saveButton.disabled = false; saveButton.textContent = '💾 Сохранить'; }
+    finally { saveButton.disabled = false; saveButton.textContent = '💾 Сохранить'; isSaving = false; }
 }
 
 // ══════════════════════════════════════════════
