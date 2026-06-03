@@ -1410,6 +1410,7 @@ async function saveWorkout() {
                     showToast('✅ Сохранено!' + (duration ? ' Время: ' + duration : ''));
                     clearTableState();
                     checkPR(date);
+                    setTimeout(() => showAIPrompt(), 2000);
             document.querySelectorAll('#exercisesBody tr').forEach(row => {
                 row.querySelectorAll('.set-input').forEach(i => i.value='');
                 const d = row.querySelector('.difficulty-input'); if(d) d.value='';
@@ -1741,6 +1742,25 @@ function stopWorkoutTimer() {
 // ══════════════════════════════════════════════
 //  PR-СИСТЕМА
 // ══════════════════════════════════════════════
+function showAIPrompt() {
+    const banner = document.createElement('div');
+    banner.id = 'aiPromptBanner';
+    banner.style.cssText = 'position:fixed;bottom:80px;left:12px;right:12px;background:var(--card);border:1.5px solid var(--green);border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;z-index:300;box-shadow:0 4px 16px rgba(0,0,0,0.3);';
+    banner.innerHTML = '<span style="font-size:14px;color:var(--text);">🤖 Получить AI анализ тренировки?</span><div style="display:flex;gap:8px;"><button onclick="runAIAnalysis()" style="background:var(--green);color:white;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;">Да</button><button onclick="document.getElementById('aiPromptBanner').remove()" style="background:var(--gl);color:var(--text2);border:none;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;">✕</button></div>';
+    document.body.appendChild(banner);
+    setTimeout(() => { const b = document.getElementById('aiPromptBanner'); if (b) b.remove(); }, 8000);
+}
+
+async function runAIAnalysis() {
+    const b = document.getElementById('aiPromptBanner');
+    if (b) b.remove();
+    showTab('ai');
+    const exName = document.getElementById('exerciseSelect')?.value;
+    if (!exName) { showToast('Выбери упражнение для анализа', true); return; }
+    const btn = document.querySelector('#tab-ai .btn-primary');
+    if (btn) btn.click();
+}
+
 async function checkPR(date) {
     try {
         const resp = await fetch('/check-pr', {
