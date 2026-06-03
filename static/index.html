@@ -577,6 +577,14 @@
                 <h2 style="margin:0;">🏆 Мой прогресс</h2>
                 <button class="btn-primary btn-sm" onclick="const m=document.getElementById('progressSummaryLoaded');if(m)m.remove();loadProgressSummary()">🔍 Обновить</button>
             </div>
+            <!-- Performance Badges -->
+            <div id="badgesBlock" style="margin-bottom:20px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <span style="font-size:13px;font-weight:600;color:var(--text2);">Performance Badges</span>
+                    <span id="badgesScore" style="font-size:13px;font-weight:700;color:var(--green);"></span>
+                </div>
+                <div id="badgesList" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;"></div>
+            </div>
             <p style="font-size:13px;color:var(--text2);margin:0 0 16px 0;">AI-сводка прогресса за последние 8 недель на основе тренировок, веса тела и замеров.</p>
 
             <div id="progressLoading" class="hidden" style="text-align:center;padding:24px;color:var(--text2);">
@@ -1020,6 +1028,7 @@ function showTab(name) {
     if (name === 'compare') loadCompareDates();
     if (name === 'history') loadWorkoutHistory();
     if (name === 'myprogress' && !document.getElementById('progressSummaryLoaded')) loadProgressSummary();
+    if (name === 'myprogress') loadAchievements();
 }
 
 // ══════════════════════════════════════════════
@@ -2023,6 +2032,34 @@ async function loadMeasurements() {
             </div>`;
         }).join('');
     } catch(e) {}
+}
+
+async function loadAchievements() {
+    try {
+        const data = await fetch('/achievements').then(r => r.json());
+        if (data.status !== 'ok') return;
+        document.getElementById('badgesScore').textContent = 'Progress Score: ' + data.score + '/100';
+        const list = document.getElementById('badgesList');
+        list.innerHTML = data.badges.map(b => {
+            const earned = b.earned;
+            const dateStr = b.date ? b.date.slice(0,10) : '';
+            return `<div onclick="showBadgeDetail('${b.name}','${b.desc}','${dateStr}',${earned})" style="
+                background:${earned ? 'var(--card)' : 'var(--gl)'};
+                border:1.5px solid ${earned ? 'var(--green)' : 'var(--border)'};
+                border-radius:12px;padding:10px 6px;text-align:center;cursor:pointer;
+                box-shadow:${earned ? '0 0 8px rgba(46,204,113,0.3)' : 'none'};
+                opacity:${earned ? '1' : '0.45'};
+                transition:all .2s;">
+                <div style="font-size:24px;margin-bottom:4px;">${b.icon}</div>
+                <div style="font-size:11px;font-weight:600;color:${earned ? 'var(--text)' : 'var(--text2)'};">${b.name}</div>
+            </div>`;
+        }).join('');
+    } catch(e) {}
+}
+
+function showBadgeDetail(name, desc, date, earned) {
+    const status = earned ? ('✅ Получено' + (date ? ' · ' + date : '')) : '🔒 Не получено';
+    showToast(name + ': ' + desc + ' — ' + status);
 }
 
 async function loadProgressSummary() {

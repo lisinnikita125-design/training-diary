@@ -1605,6 +1605,107 @@ def progress_summary():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+
+@app.route("/achievements")
+def get_achievements():
+    require_auth()
+    uid = current_user_id()
+    conn = get_db()
+    from datetime import date, timedelta
+
+    # 1. Первая тренировка
+    first_workout = conn.execute(
+        "SELECT MIN(workout_date) as d FROM workout_log WHERE user_id=? AND set_number>0", (uid,)
+    ).fetchone()
+
+    # 2. Всего тренировок
+    total_workouts = conn.execute(
+        "SELECT COUNT(DISTINCT workout_date) as c FROM workout_log WHERE user_id=? AND set_number>0", (uid,)
+    ).fetchone()["c"]
+
+    # 3. Первый PR (упражнение с ростом веса)
+    pr = conn.execute("""
+        SELECT MIN(workout_date) as d FROM (
+            SELECT exercise_id, workout_date, MAX(weight) as mw
+            FROM workout_log WHERE user_id=? AND set_number>0
+            GROUP BY exercise_id, workout_date
+        ) t1 WHERE mw > (
+            SELECT COALESCE(MAX(weight),0) FROM workout_log
+            WHERE user_id=? AND exercise_id=t1.exercise_id
+            AND workout_date < t1.workout_date AND set_number>0
+        )
+    """, (uid, uid)).fetchone()
+
+    # 4. Consistency — 4 недели подряд
+    dates = [r["workout_date"] for r in conn.execute(
+        "SELECT DISTINCT workout_date FROM workout_log WHERE user_id=? AND set_number>0 ORDER BY workout_date", (uid,)
+    ).fetchall()]
+    consistency_date = None
+    if dates:
+        weeks = set()
+        for d in dates:
+            y, w, _ = date.fromisoformat(d).isocalendar()
+            weeks.add((y, w))
+        weeks = sorted(weeks)
+        streak = 1
+        streak_start = weeks[0]
+        for i in range(1, len(weeks)):
+            prev = date.fromisocalendar(weeks[i-1][0], weeks[i-1][1], 1)
+            curr = date.fromisocalendar(weeks[i][0], weeks[i][1], 1)
+            if (curr - prev).days == 7:
+                streak += 1
+                if streak >= 4:
+                    consistency_date = curr.isoformat()
+                    break
+            else:
+                streak = 1
+
+    # 5. Volume Builder — +10% тоннажа (сравниваем первую и последнюю неделю)
+    volume_date = None
+    weekly = conn.execute("""
+        SELECT strftime('%Y-%W', workout_date) as week, SUM(weight*reps) as t
+        FROM workout_log WHERE user_id=? AND set_number>0
+        GROUP BY week ORDER BY week
+    """, (uid,)).fetchall()
+    if len(weekly) >= 2:
+        first_t = weekly[0]["t"] or 0
+        last_t = weekly[-1]["t"] or 0
+        if first_t > 0 and last_t >= first_t * 1.1:
+            volume_date = dates[-1] if dates else None
+
+    # 6. Weight Tracker
+    bw = conn.execute(
+        "SELECT MIN(log_date) as d FROM body_weight WHERE user_id=?", (uid,)
+    ).fetchone()
+
+    # 7. Measurement Tracker
+    meas = conn.execute(
+        "SELECT MIN(log_date) as d FROM body_measurements WHERE user_id=?", (uid,)
+    ).fetchone()
+
+    # 8. AI Follower — первый AI анализ
+    ai = conn.execute(
+        "SELECT MIN(created_at) as d FROM ai_recommendations WHERE user_id=?", (uid,)
+    ).fetchone()
+
+    conn.close()
+
+    badges = [
+        {"id": "first_workout",   "icon": "🏋️", "name": "First Workout",       "desc": "Первая тренировка в Progressor",     "earned": bool(first_workout and first_workout["d"]), "date": first_workout["d"] if first_workout else None},
+        {"id": "progress_champ",  "icon": "🏆", "name": "Progress Champion",    "desc": "10 тренировок выполнено",            "earned": total_workouts >= 10, "date": dates[9] if total_workouts >= 10 and len(dates) >= 10 else None},
+        {"id": "pr_hunter",       "icon": "🥇", "name": "PR Hunter",            "desc": "Первый личный рекорд по весу",       "earned": bool(pr and pr["d"]), "date": pr["d"] if pr else None},
+        {"id": "consistency",     "icon": "🔥", "name": "Consistency",          "desc": "4 недели тренировок подряд",         "earned": bool(consistency_date), "date": consistency_date},
+        {"id": "volume_builder",  "icon": "📈", "name": "Volume Builder",       "desc": "Тоннаж вырос на 10%+",              "earned": bool(volume_date), "date": volume_date},
+        {"id": "weight_tracker",  "icon": "⚖️", "name": "Weight Tracker",       "desc": "Первая запись веса тела",            "earned": bool(bw and bw["d"]), "date": bw["d"] if bw else None},
+        {"id": "meas_tracker",    "icon": "📏", "name": "Measurement Tracker",  "desc": "Первые замеры тела",                 "earned": bool(meas and meas["d"]), "date": meas["d"] if meas else None},
+        {"id": "ai_follower",     "icon": "🧠", "name": "AI Follower",          "desc": "Первый AI анализ получен",           "earned": bool(ai and ai["d"]), "date": str(ai["d"])[:10] if ai and ai["d"] else None},
+    ]
+
+    earned = sum(1 for b in badges if b["earned"])
+    score = round(earned / len(badges) * 100)
+
+    return jsonify({"status": "ok", "badges": badges, "score": score, "earned": earned, "total": len(badges)})
+
 @app.route("/admin/verify-user/<int:user_id>", methods=["POST"])
 def admin_verify_user(user_id):
     require_admin()
