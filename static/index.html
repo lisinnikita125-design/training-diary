@@ -1742,11 +1742,13 @@ function stopWorkoutTimer() {
 // ══════════════════════════════════════════════
 //  PR-СИСТЕМА
 // ══════════════════════════════════════════════
+function dismissAIPrompt() { const b = document.getElementById("aiPromptBanner"); if (b) b.remove(); }
+
 function showAIPrompt() {
     const banner = document.createElement('div');
     banner.id = 'aiPromptBanner';
     banner.style.cssText = 'position:fixed;bottom:80px;left:12px;right:12px;background:var(--card);border:1.5px solid var(--green);border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;z-index:300;box-shadow:0 4px 16px rgba(0,0,0,0.3);';
-    banner.innerHTML = '<span style="font-size:14px;color:var(--text);">🤖 Получить AI анализ тренировки?</span><div style="display:flex;gap:8px;"><button onclick="runAIAnalysis()" style="background:var(--green);color:white;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;">Да</button><button onclick="document.getElementById('aiPromptBanner').remove()" style="background:var(--gl);color:var(--text2);border:none;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;">✕</button></div>';
+    banner.innerHTML = '<span style="font-size:14px;color:var(--text);">🤖 Получить AI анализ тренировки?</span><div style="display:flex;gap:8px;"><button onclick="runAIAnalysis()" style="background:var(--green);color:white;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;">Да</button><button onclick="dismissAIPrompt()" style="background:var(--gl);color:var(--text2);border:none;border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;">✕</button></div>';
     document.body.appendChild(banner);
     setTimeout(() => { const b = document.getElementById('aiPromptBanner'); if (b) b.remove(); }, 8000);
 }
