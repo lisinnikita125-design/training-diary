@@ -51,25 +51,14 @@ logger.setLevel(logging.INFO)
 logger.addHandler(log_handler)
 
 def send_telegram(message):
-    """Отправляет сообщение об ошибке в Telegram."""
+    """Отправляет уведомление об ошибке на email (Telegram недоступен на free PythonAnywhere)."""
     try:
         import config as _cfg
-        token = getattr(_cfg, 'TELEGRAM_TOKEN', '')
-        chat_id = getattr(_cfg, 'TELEGRAM_CHAT_ID', '')
-        if not token or not chat_id:
+        to = getattr(_cfg, 'MAIL_USER', '')
+        if not to:
             return
-        import urllib.request, json as _json
-        payload = _json.dumps({
-            "chat_id": chat_id,
-            "text": message,
-            "parse_mode": "HTML"
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            data=payload,
-            headers={"Content-Type": "application/json"}
-        )
-        urllib.request.urlopen(req, timeout=5)
+        clean = message.replace('<b>', '').replace('</b>', '').replace('<br>', ' ')
+        send_email(to, 'Progressor Error', f'<pre>{clean}</pre>')
     except Exception:
         pass
 
