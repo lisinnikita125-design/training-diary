@@ -1691,14 +1691,14 @@ def get_achievements():
     conn.close()
 
     badges = [
-        {"id": "first_workout",   "icon": "🏋️", "name": "First Workout",       "desc": "Первая тренировка в Progressor",     "earned": bool(first_workout and first_workout["d"]), "date": first_workout["d"] if first_workout else None},
-        {"id": "progress_champ",  "icon": "🏆", "name": "Progress Champion",    "desc": "10 тренировок выполнено",            "earned": total_workouts >= 10, "date": dates[9] if total_workouts >= 10 and len(dates) >= 10 else None},
-        {"id": "pr_hunter",       "icon": "🥇", "name": "PR Hunter",            "desc": "Первый личный рекорд по весу",       "earned": bool(pr and pr["d"]), "date": pr["d"] if pr else None},
-        {"id": "consistency",     "icon": "🔥", "name": "Consistency",          "desc": "4 недели тренировок подряд",         "earned": bool(consistency_date), "date": consistency_date},
-        {"id": "volume_builder",  "icon": "📈", "name": "Volume Builder",       "desc": "Тоннаж вырос на 10%+",              "earned": bool(volume_date), "date": volume_date},
-        {"id": "weight_tracker",  "icon": "⚖️", "name": "Weight Tracker",       "desc": "Первая запись веса тела",            "earned": bool(bw and bw["d"]), "date": bw["d"] if bw else None},
-        {"id": "meas_tracker",    "icon": "📏", "name": "Measurement Tracker",  "desc": "Первые замеры тела",                 "earned": bool(meas and meas["d"]), "date": meas["d"] if meas else None},
-        {"id": "ai_follower",     "icon": "🧠", "name": "AI Follower",          "desc": "Первый AI анализ получен",           "earned": bool(ai and ai["d"]), "date": str(ai["d"])[:10] if ai and ai["d"] else None},
+        {"id": "first_workout",   "icon": "🏋️", "name": "Первая тренировка",       "desc": "Первая тренировка в Progressor",     "earned": bool(first_workout and first_workout["d"]), "date": first_workout["d"] if first_workout else None},
+        {"id": "progress_champ",  "icon": "🏆", "name": "Чемпион прогресса",    "desc": "10 тренировок выполнено",            "earned": total_workouts >= 10, "date": dates[9] if total_workouts >= 10 and len(dates) >= 10 else None},
+        {"id": "pr_hunter",       "icon": "🥇", "name": "Охотник за рекордами",            "desc": "Первый личный рекорд по весу",       "earned": bool(pr and pr["d"]), "date": pr["d"] if pr else None},
+        {"id": "consistency",     "icon": "🔥", "name": "Постоянство",          "desc": "4 недели тренировок подряд",         "earned": bool(consistency_date), "date": consistency_date},
+        {"id": "volume_builder",  "icon": "📈", "name": "Рост объёма",       "desc": "Тоннаж вырос на 10%+",              "earned": bool(volume_date), "date": volume_date},
+        {"id": "weight_tracker",  "icon": "⚖️", "name": "Контроль веса",       "desc": "Первая запись веса тела",            "earned": bool(bw and bw["d"]), "date": bw["d"] if bw else None},
+        {"id": "meas_tracker",    "icon": "📏", "name": "Замеры тела",  "desc": "Первые замеры тела",                 "earned": bool(meas and meas["d"]), "date": meas["d"] if meas else None},
+        {"id": "ai_follower",     "icon": "🧠", "name": "Следую AI",          "desc": "Первый AI анализ получен",           "earned": bool(ai and ai["d"]), "date": str(ai["d"])[:10] if ai and ai["d"] else None},
     ]
 
     earned = sum(1 for b in badges if b["earned"])
