@@ -575,7 +575,7 @@
         <div class="section">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
                 <h2 style="margin:0;">🏆 Мой прогресс</h2>
-                <button class="btn-primary btn-sm" onclick="loadProgressSummary()">🔍 Обновить</button>
+                <button class="btn-primary btn-sm" onclick="const m=document.getElementById('progressSummaryLoaded');if(m)m.remove();loadProgressSummary()">🔍 Обновить</button>
             </div>
             <p style="font-size:13px;color:var(--text2);margin:0 0 16px 0;">AI-сводка прогресса за последние 8 недель на основе тренировок, веса тела и замеров.</p>
 
@@ -1013,7 +1013,7 @@ function showTab(name) {
     if (name === 'stats') loadStats();
     if (name === 'compare') loadCompareDates();
     if (name === 'history') loadWorkoutHistory();
-    if (name === 'myprogress') loadProgressSummary();
+    if (name === 'myprogress' && !document.getElementById('progressSummaryLoaded')) loadProgressSummary();
 }
 
 // ══════════════════════════════════════════════
@@ -2031,6 +2031,7 @@ async function loadProgressSummary() {
         if (data.status === 'ok') {
             text.innerHTML = renderAIText(data.summary);
             result.classList.remove('hidden');
+            if (!document.getElementById('progressSummaryLoaded')) { const m = document.createElement('span'); m.id = 'progressSummaryLoaded'; m.style.display = 'none'; document.body.appendChild(m); }
         } else {
             empty.classList.remove('hidden');
         }
