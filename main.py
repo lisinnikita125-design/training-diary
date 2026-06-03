@@ -32,12 +32,13 @@ except Exception:
 
 init_db()
 
-import logging
+import logging, os
 from logging.handlers import RotatingFileHandler
 
+os.makedirs('/home/NikitaLisin/logs', exist_ok=True)
 log_handler = RotatingFileHandler(
     '/home/NikitaLisin/logs/app.log',
-    maxBytes=1024*1024,  # 1MB
+    maxBytes=1024*1024,
     backupCount=5,
     encoding='utf-8'
 )
@@ -48,9 +49,6 @@ log_handler.setFormatter(logging.Formatter(
 logger = logging.getLogger('progressor')
 logger.setLevel(logging.INFO)
 logger.addHandler(log_handler)
-
-import os
-os.makedirs('/home/NikitaLisin/logs', exist_ok=True)
 
 def send_telegram(message):
     """Отправляет сообщение об ошибке в Telegram."""
