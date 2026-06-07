@@ -1,12 +1,12 @@
 from flask import Flask, jsonify, request, abort, session, Response
-from database import get_db, init_db
+from database import get_db, init_db, seed_user
 import os, shutil, csv, io, secrets
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
-
+ 
 app = Flask(__name__)
 import os
-
+ 
 # ── Читаем секреты из файла config.py ───────────────────
 try:
     import config as _cfg
@@ -29,12 +29,24 @@ except Exception:
     MAIL_PASSWORD = ""
     MAIL_FROM = ""
     APP_URL = "https://nikitalisin.pythonanywhere.com"
-
+ 
 init_db()
-
+ 
+# Засев программы для существующих пользователей без своих упражнений
+def _seed_existing_users():
+    conn = get_db()
+    users = conn.execute("""
+        SELECT u.id FROM users u
+        WHERE NOT EXISTS (SELECT 1 FROM exercises e WHERE e.user_id = u.id)
+    """).fetchall()
+    conn.close()
+    for u in users:
+        seed_user(u["id"])
+_seed_existing_users()
+ 
 import logging, os
 from logging.handlers import RotatingFileHandler
-
+ 
 os.makedirs('/home/NikitaLisin/logs', exist_ok=True)
 log_handler = RotatingFileHandler(
     '/home/NikitaLisin/logs/app.log',
@@ -49,7 +61,7 @@ log_handler.setFormatter(logging.Formatter(
 logger = logging.getLogger('progressor')
 logger.setLevel(logging.INFO)
 logger.addHandler(log_handler)
-
+ 
 def send_telegram(message):
     """Отправляет уведомление об ошибке на email (Telegram недоступен на free PythonAnywhere)."""
     try:
@@ -61,8 +73,8 @@ def send_telegram(message):
         send_email(to, 'Progressor Error', f'<pre>{clean}</pre>')
     except Exception:
         pass
-
-
+ 
+ 
 def migrate_existing_data():
     """Привязывает существующие данные (user_id IS NULL) к первому пользователю."""
     conn = get_db()
@@ -77,8 +89,8 @@ def migrate_existing_data():
             pass
         conn.commit()
     conn.close()
-
-
+ 
+ 
 def send_email(to, subject, body_html):
     """Отправка письма через SMTP. Молча проглатывает ошибки."""
     if not MAIL_USER or not MAIL_PASSWORD:
@@ -98,32 +110,32 @@ def send_email(to, subject, body_html):
             srv.sendmail(MAIL_FROM, to, msg.as_string())
     except Exception:
         pass
-
-
-
+ 
+ 
+ 
 # ══════════════════════════════════════════════
 #  АВТОРИЗАЦИЯ
 # ══════════════════════════════════════════════
-
+ 
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
     name = (data.get("name") or "").strip()
-
+ 
     if not email or "@" not in email:
         return jsonify({"status": "error", "message": "Неверный email"}), 400
     if len(password) < 6:
         return jsonify({"status": "error", "message": "Пароль минимум 6 символов"}), 400
-
+ 
     conn = get_db()
     cur = conn.cursor()
     existing = cur.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
     if existing:
         conn.close()
         return jsonify({"status": "error", "message": "Email уже зарегистрирован"}), 409
-
+ 
     token = secrets.token_urlsafe(32)
     cur.execute(
         "INSERT INTO users (email, password_hash, name, is_verified, verify_token) VALUES (?, ?, ?, 0, ?)",
@@ -132,7 +144,10 @@ def register():
     conn.commit()
     user_id = cur.lastrowid
     conn.close()
-
+ 
+    # Копируем системную программу новому пользователю
+    seed_user(user_id)
+ 
     verify_url = f"{APP_URL}/verify-email?token={token}"
     send_email(email, "Подтверди email — Progressor", f"""
     <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;background:#0f1117;border-radius:16px;overflow:hidden;">
@@ -149,10 +164,10 @@ def register():
         </div>
     </div>
     """)
-
+ 
     return jsonify({"status": "ok", "message": "Регистрация успешна. Проверь почту для подтверждения."})
-
-
+ 
+ 
 @app.route("/verify-email")
 def verify_email():
     token = request.args.get("token", "")
@@ -171,39 +186,39 @@ def verify_email():
         <h2>✅ Email подтверждён!</h2>
         <p><a href="/">Войти в приложение</a></p>
     </body></html>"""
-
-
+ 
+ 
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
-
+ 
     conn = get_db()
     cur = conn.cursor()
     user = cur.execute(
         "SELECT id, password_hash, name, is_verified FROM users WHERE email = ?", (email,)
     ).fetchone()
     conn.close()
-
+ 
     if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"status": "error", "message": "Неверный email или пароль"}), 401
     if not user["is_verified"]:
         return jsonify({"status": "error", "message": "Подтверди email перед входом"}), 403
-
+ 
     session["auth"] = True
     session["user_id"] = user["id"]
     session["user_name"] = user["name"] or email
     logger.info(f"LOGIN user_id={user['id']} email={email}")
     return jsonify({"status": "ok", "name": user["name"] or email})
-
-
+ 
+ 
 @app.route("/logout", methods=["POST"])
 def logout():
     session.clear()
     return jsonify({"status": "ok"})
-
-
+ 
+ 
 @app.route("/check-auth")
 def check_auth():
     if session.get("auth"):
@@ -213,8 +228,8 @@ def check_auth():
         is_admin = bool(user and user["is_admin"])
         return jsonify({"auth": True, "name": session.get("user_name", ""), "is_admin": is_admin})
     return jsonify({"auth": False})
-
-
+ 
+ 
 @app.route("/forgot-password", methods=["POST"])
 def forgot_password():
     data = request.get_json() or {}
@@ -238,8 +253,8 @@ def forgot_password():
     conn.close()
     # Всегда отвечаем одинаково (безопасность)
     return jsonify({"status": "ok", "message": "Если email зарегистрирован — письмо отправлено"})
-
-
+ 
+ 
 @app.route("/reset-password", methods=["GET", "POST"])
 def reset_password():
     if request.method == "GET":
@@ -264,7 +279,7 @@ def reset_password():
             }}
             </script>
         </body></html>"""
-
+ 
     data = request.get_json() or {}
     token = data.get("token", "")
     new_pwd = data.get("password", "")
@@ -288,8 +303,8 @@ def reset_password():
     conn.commit()
     conn.close()
     return jsonify({"status": "ok", "message": "Пароль обновлён! Перенаправляем..."})
-
-
+ 
+ 
 def require_auth():
     if not session.get("auth"):
         abort(401, description="Не авторизован")
@@ -299,12 +314,12 @@ def require_auth():
     if not user:
         session.clear()
         abort(401, description="Пользователь не найден")
-
-
+ 
+ 
 def current_user_id():
     return session.get("user_id")
-
-
+ 
+ 
 # ══════════════════════════════════════════════
 #  БЭКАП
 # ══════════════════════════════════════════════
@@ -319,9 +334,9 @@ def backup_db():
     backups = sorted([os.path.join(backup_dir, f) for f in os.listdir(backup_dir) if f.endswith(".db")])
     for old in backups[:-7]:
         os.remove(old)
-
-
-
+ 
+ 
+ 
 # ══════════════════════════════════════════════
 #  АДМИН
 # ══════════════════════════════════════════════
@@ -333,7 +348,7 @@ def require_admin():
     conn.close()
     if not user or not user["is_admin"]:
         abort(403)
-
+ 
 @app.route("/admin/users")
 def admin_users():
     require_admin()
@@ -348,8 +363,8 @@ def admin_users():
     """).fetchall()
     conn.close()
     return jsonify({"users": [dict(u) for u in users]})
-
-
+ 
+ 
 @app.route("/admin/toggle-admin/<int:user_id>", methods=["POST"])
 def admin_toggle_admin(user_id):
     require_admin()
@@ -365,7 +380,7 @@ def admin_toggle_admin(user_id):
     conn.commit()
     conn.close()
     return jsonify({"status": "ok", "is_admin": new_val})
-
+ 
 @app.route("/admin/delete-user/<int:user_id>", methods=["DELETE"])
 def admin_delete_user(user_id):
     require_admin()
@@ -374,11 +389,12 @@ def admin_delete_user(user_id):
     conn = get_db()
     conn.execute("DELETE FROM workout_log WHERE user_id=?", (user_id,))
     conn.execute("DELETE FROM recovery_log WHERE user_id=?", (user_id,))
+    conn.execute("DELETE FROM exercises WHERE user_id=?", (user_id,))
     conn.execute("DELETE FROM users WHERE id=?", (user_id,))
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
-
+ 
 # ══════════════════════════════════════════════
 #  ПРОФИЛЬ
 # ══════════════════════════════════════════════
@@ -392,7 +408,7 @@ def get_profile():
     ).fetchone()
     conn.close()
     return jsonify(dict(user))
-
+ 
 @app.route("/profile", methods=["POST"])
 def update_profile():
     require_auth()
@@ -406,7 +422,7 @@ def update_profile():
     conn.close()
     session["user_name"] = data.get("name") or session.get("user_name")
     return jsonify({"status": "ok"})
-
+ 
 @app.route("/change-password", methods=["POST"])
 def change_password():
     require_auth()
@@ -425,8 +441,8 @@ def change_password():
     conn.commit()
     conn.close()
     return jsonify({"status": "ok", "message": "Пароль изменён"})
-
-
+ 
+ 
 @app.route("/body-weight", methods=["GET"])
 def get_body_weight():
     require_auth()
@@ -437,7 +453,7 @@ def get_body_weight():
     """, (current_user_id(),)).fetchall()
     conn.close()
     return jsonify({"history": [dict(r) for r in rows]})
-
+ 
 @app.route("/body-weight", methods=["POST"])
 def save_body_weight():
     require_auth()
@@ -457,8 +473,8 @@ def save_body_weight():
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
-
-
+ 
+ 
 @app.route("/measurements", methods=["GET"])
 def get_measurements():
     require_auth()
@@ -470,7 +486,7 @@ def get_measurements():
     """, (current_user_id(),)).fetchall()
     conn.close()
     return jsonify({"history": [dict(r) for r in rows]})
-
+ 
 @app.route("/measurements", methods=["POST"])
 def save_measurements():
     require_auth()
@@ -493,27 +509,30 @@ def save_measurements():
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
-
+ 
 # ══════════════════════════════════════════════
 #  ДНИ И УПРАЖНЕНИЯ
 # ══════════════════════════════════════════════
 @app.route("/day/<int:day_id>")
 def get_day(day_id):
     require_auth()
+    uid = current_user_id()
     conn = get_db()
     cur = conn.cursor()
+    # Дни — глобальные шаблоны, без фильтра по user
     day = cur.execute("SELECT id, name FROM day_templates WHERE id = ?", (day_id,)).fetchone()
     if not day:
         conn.close()
         abort(404, description="День не найден")
+    # Упражнения — только личные копии пользователя
     exercises = cur.execute("""
         SELECT id, name, machine_model, plan_sets, plan_reps_range, default_weight, rest_seconds
-        FROM exercises WHERE day_id = ? ORDER BY sort_order
-    """, (day_id,)).fetchall()
+        FROM exercises WHERE day_id = ? AND user_id = ? ORDER BY sort_order
+    """, (day_id, uid)).fetchall()
     conn.close()
     return jsonify({"day": dict(day), "exercises": [dict(ex) for ex in exercises]})
-
-
+ 
+ 
 # ══════════════════════════════════════════════
 #  СОХРАНЕНИЕ ТРЕНИРОВКИ
 # ══════════════════════════════════════════════
@@ -523,27 +542,29 @@ def log_workout():
     data = request.get_json()
     if not data:
         abort(400, description="Отсутствуют данные")
+    uid = current_user_id()
     conn = get_db()
     cur = conn.cursor()
+    # Дни глобальные — проверяем без user_id
     day = cur.execute("SELECT id FROM day_templates WHERE id = ?", (data["day_id"],)).fetchone()
     if not day:
         conn.close()
         abort(400, description="Неверный day_id")
-
+ 
     for ex_log in data["exercises"]:
+        # Упражнения — только из личной программы пользователя
         exercise = cur.execute(
-            "SELECT id, default_weight FROM exercises WHERE id = ? AND day_id = ?",
-            (ex_log["exercise_id"], data["day_id"])
+            "SELECT id, default_weight FROM exercises WHERE id = ? AND day_id = ? AND user_id = ?",
+            (ex_log["exercise_id"], data["day_id"], uid)
         ).fetchone()
         if not exercise:
             conn.close()
             abort(400, description=f"Упражнение {ex_log['exercise_id']} не относится к дню {data['day_id']}")
-
-        uid = current_user_id()
-        # Защита от дублей
-        cur.execute("DELETE FROM workout_log WHERE exercise_id = ? AND workout_date = ? AND (user_id = ? OR user_id IS NULL)",
+ 
+        # Защита от дублей (строгий user_id)
+        cur.execute("DELETE FROM workout_log WHERE exercise_id = ? AND workout_date = ? AND user_id = ?",
                     (ex_log["exercise_id"], data["date"], uid))
-
+ 
         # Пропуск упражнения
         if ex_log.get("skipped"):
             cur.execute("""
@@ -551,7 +572,7 @@ def log_workout():
                 VALUES (?, ?, ?, 0, 0, 0, 'пропущено', ?)
             """, (uid, ex_log["exercise_id"], data["date"], ex_log.get("skip_reason", "")))
             continue
-
+ 
         for s in ex_log["sets"]:
             weight = s.get("weight") if s.get("weight") is not None else exercise["default_weight"]
             if s["reps"] < 0 or weight < 0:
@@ -562,7 +583,7 @@ def log_workout():
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (uid, ex_log["exercise_id"], data["date"], s["set_number"],
                   weight, s["reps"], s.get("difficulty"), s.get("notes"), data.get("duration_seconds")))
-
+ 
     conn.commit()
     conn.close()
     try:
@@ -571,8 +592,8 @@ def log_workout():
         pass
     logger.info(f"WORKOUT_SAVED user_id={current_user_id()} date={data['date']} day={data['day_id']}")
     return jsonify({"status": "ok", "date": data["date"], "day_id": data["day_id"]})
-
-
+ 
+ 
 # ══════════════════════════════════════════════
 #  ПРОГРЕСС
 # ══════════════════════════════════════════════
@@ -591,14 +612,14 @@ def get_progress_by_name():
         FROM workout_log wl
         JOIN exercises e ON e.id = wl.exercise_id
         WHERE e.name = ? AND wl.set_number > 0
-          AND (wl.user_id = ? OR wl.user_id IS NULL)
+          AND wl.user_id = ?
         ORDER BY wl.workout_date DESC, wl.set_number ASC
         LIMIT ?
     """, (name, uid, limit * 10)).fetchall()
     conn.close()
     return jsonify({"exercise_name": name, "history": [dict(r) for r in rows]})
-
-
+ 
+ 
 @app.route("/workout-stats")
 def workout_stats():
     require_auth()
@@ -615,14 +636,14 @@ def workout_stats():
         FROM workout_log wl
         JOIN exercises e ON e.id = wl.exercise_id
         WHERE e.name = ? AND wl.set_number > 0
-          AND (wl.user_id = ? OR wl.user_id IS NULL)
+          AND wl.user_id = ?
         GROUP BY wl.workout_date
         ORDER BY wl.workout_date ASC
     """, (name, uid)).fetchall()
     conn.close()
     return jsonify({"exercise_name": name, "stats": [dict(r) for r in rows]})
-
-
+ 
+ 
 # ══════════════════════════════════════════════
 #  СРАВНЕНИЕ ДВУХ ТРЕНИРОВОК
 # ══════════════════════════════════════════════
@@ -635,7 +656,7 @@ def compare_workouts():
         abort(400, description="Нужны date1 и date2")
     conn = get_db()
     cur = conn.cursor()
-
+ 
     def get_day_data(date):
         uid = current_user_id()
         rows = cur.execute("""
@@ -643,7 +664,7 @@ def compare_workouts():
             FROM workout_log wl
             JOIN exercises e ON e.id = wl.exercise_id
             WHERE wl.workout_date = ? AND wl.set_number > 0
-              AND (wl.user_id = ? OR wl.user_id IS NULL)
+              AND wl.user_id = ?
             ORDER BY e.sort_order, wl.set_number
         """, (date, uid)).fetchall()
         # Группируем по упражнению
@@ -656,10 +677,10 @@ def compare_workouts():
             result[name]["max_weight"] = max(result[name]["max_weight"], r["weight"])
             result[name]["tonnage"] = round(result[name]["tonnage"] + r["weight"] * r["reps"], 1)
         return result
-
+ 
     data1 = get_day_data(date1)
     data2 = get_day_data(date2)
-
+ 
     # Объединяем все упражнения
     all_names = sorted(set(list(data1.keys()) + list(data2.keys())))
     comparison = []
@@ -673,11 +694,11 @@ def compare_workouts():
             "weight_diff": round(d2.get("max_weight", 0) - d1.get("max_weight", 0), 1),
             "tonnage_diff": round(d2.get("tonnage", 0) - d1.get("tonnage", 0), 1)
         })
-
+ 
     conn.close()
     return jsonify({"date1": date1, "date2": date2, "comparison": comparison})
-
-
+ 
+ 
 @app.route("/workout-dates")
 def workout_dates():
     """Даты тренировок сгруппированные по дням (День 1/2/3)."""
@@ -690,7 +711,7 @@ def workout_dates():
         FROM workout_log wl
         JOIN exercises e ON e.id = wl.exercise_id
         WHERE wl.set_number > 0
-          AND (wl.user_id = ? OR wl.user_id IS NULL)
+          AND wl.user_id = ?
         ORDER BY wl.workout_date DESC
         LIMIT 60
     """, (uid,)).fetchall()
@@ -705,8 +726,8 @@ def workout_dates():
             seen.add(key)
             grouped[r["day_id"]].append(r["workout_date"])
     return jsonify({"by_day": {str(k): v for k, v in sorted(grouped.items())}})
-
-
+ 
+ 
 # ══════════════════════════════════════════════
 #  РЕДАКТИРОВАНИЕ
 # ══════════════════════════════════════════════
@@ -716,19 +737,21 @@ def edit_log():
     data = request.get_json()
     if not data:
         abort(400, description="Нет данных")
+    uid = current_user_id()
     conn = get_db()
     cur = conn.cursor()
+    # ФИКС: добавлен AND user_id = ? — только свои записи
     cur.execute("""
         UPDATE workout_log SET weight = ?, reps = ?, difficulty = ?
         WHERE exercise_id IN (SELECT id FROM exercises WHERE name = ?)
-          AND workout_date = ? AND set_number = ?
+          AND workout_date = ? AND set_number = ? AND user_id = ?
     """, (data["weight"], data["reps"], data.get("difficulty"),
-          data["exercise_name"], data["workout_date"], data["set_number"]))
+          data["exercise_name"], data["workout_date"], data["set_number"], uid))
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
-
-
+ 
+ 
 @app.route("/delete-workout", methods=["POST"])
 def delete_workout():
     require_auth()
@@ -742,16 +765,18 @@ def delete_workout():
     conn.close()
     logger.info(f"WORKOUT_DELETED user_id={uid} date={data['workout_date']}")
     return jsonify({"status": "ok"})
-
+ 
 @app.route("/exercise/<int:exercise_id>", methods=["PUT"])
 def update_exercise(exercise_id):
     require_auth()
     data = request.get_json()
     if not data:
         abort(400, description="Нет данных для обновления")
+    uid = current_user_id()
     conn = get_db()
     cur = conn.cursor()
-    ex = cur.execute("SELECT id FROM exercises WHERE id = ?", (exercise_id,)).fetchone()
+    # Проверяем владельца упражнения
+    ex = cur.execute("SELECT id FROM exercises WHERE id = ? AND user_id = ?", (exercise_id, uid)).fetchone()
     if not ex:
         conn.close()
         abort(404, description="Упражнение не найдено")
@@ -765,12 +790,13 @@ def update_exercise(exercise_id):
         conn.close()
         abort(400, description="Нет полей для обновления")
     params.append(exercise_id)
-    cur.execute(f"UPDATE exercises SET {', '.join(updates)} WHERE id = ?", params)
+    params.append(uid)
+    cur.execute(f"UPDATE exercises SET {', '.join(updates)} WHERE id = ? AND user_id = ?", params)
     conn.commit()
     conn.close()
     return jsonify({"status": "ok", "exercise_id": exercise_id})
-
-
+ 
+ 
 # ══════════════════════════════════════════════
 #  ВСПОМОГАТЕЛЬНЫЕ
 # ══════════════════════════════════════════════
@@ -784,7 +810,7 @@ def last_weight(exercise_id):
         SELECT wl.weight FROM workout_log wl
         JOIN exercises e ON e.id = wl.exercise_id
         WHERE e.name = (SELECT name FROM exercises WHERE id = ?) AND wl.set_number > 0
-          AND (wl.user_id = ? OR wl.user_id IS NULL)
+          AND wl.user_id = ?
         ORDER BY wl.workout_date DESC, wl.set_number DESC LIMIT 1
     """, (exercise_id, uid)).fetchone()
     if row:
@@ -793,38 +819,44 @@ def last_weight(exercise_id):
     ex = cur.execute("SELECT default_weight FROM exercises WHERE id = ?", (exercise_id,)).fetchone()
     conn.close()
     return jsonify({"weight": ex["default_weight"] if ex else 0})
-
-
+ 
+ 
 @app.route("/exercise-names")
 def get_exercise_names():
     require_auth()
     conn = get_db()
     cur = conn.cursor()
-    rows = cur.execute("SELECT DISTINCT name FROM exercises ORDER BY name").fetchall()
+    # Только упражнения текущего пользователя
+    rows = cur.execute(
+        "SELECT DISTINCT name FROM exercises WHERE user_id = ? ORDER BY name",
+        (current_user_id(),)
+    ).fetchall()
     conn.close()
     return jsonify({"names": [r["name"] for r in rows]})
-
-
+ 
+ 
 @app.route("/stats-summary")
 def stats_summary():
     require_auth()
     conn = get_db()
     cur = conn.cursor()
     uid = current_user_id()
-    total = cur.execute("SELECT COUNT(DISTINCT workout_date) FROM workout_log WHERE (user_id = ? OR user_id IS NULL)", (uid,)).fetchone()[0]
+    total = cur.execute(
+        "SELECT COUNT(DISTINCT workout_date) FROM workout_log WHERE user_id = ?", (uid,)
+    ).fetchone()[0]
     this_month = cur.execute("""
         SELECT COUNT(DISTINCT workout_date) FROM workout_log
         WHERE strftime('%Y-%m', workout_date) = strftime('%Y-%m', 'now')
-          AND (user_id = ? OR user_id IS NULL)
+          AND user_id = ?
     """, (uid,)).fetchone()[0]
     month_tonnage = cur.execute("""
         SELECT COALESCE(SUM(weight * reps), 0) FROM workout_log
         WHERE strftime('%Y-%m', workout_date) = strftime('%Y-%m', 'now') AND set_number > 0
-          AND (user_id = ? OR user_id IS NULL)
+          AND user_id = ?
     """, (uid,)).fetchone()[0]
     weeks = cur.execute("""
         SELECT DISTINCT strftime('%Y-%W', workout_date) as week
-        FROM workout_log WHERE (user_id = ? OR user_id IS NULL) ORDER BY week DESC LIMIT 52
+        FROM workout_log WHERE user_id = ? ORDER BY week DESC LIMIT 52
     """, (uid,)).fetchall()
     streak_weeks = 0
     today = datetime.today()
@@ -836,7 +868,7 @@ def stats_summary():
             break
     weekly_rows = cur.execute("""
         SELECT strftime('%Y-%W', workout_date) as week, SUM(weight * reps) as tonnage
-        FROM workout_log WHERE set_number > 0 AND (user_id = ? OR user_id IS NULL)
+        FROM workout_log WHERE set_number > 0 AND user_id = ?
         GROUP BY week ORDER BY week DESC LIMIT 12
     """, (uid,)).fetchall()
     weekly = [{"week": r["week"], "tonnage": round(r["tonnage"], 1)} for r in reversed(weekly_rows)]
@@ -846,8 +878,8 @@ def stats_summary():
         "streak_weeks": streak_weeks, "month_tonnage": round(month_tonnage, 1),
         "weekly": weekly
     })
-
-
+ 
+ 
 @app.route("/export-csv")
 def export_csv():
     require_auth()
@@ -861,7 +893,7 @@ def export_csv():
         FROM workout_log wl
         JOIN exercises e ON e.id = wl.exercise_id
         JOIN day_templates dt ON dt.id = e.day_id
-        WHERE wl.set_number > 0 AND (wl.user_id = ? OR wl.user_id IS NULL)
+        WHERE wl.set_number > 0 AND wl.user_id = ?
         ORDER BY wl.workout_date DESC, e.sort_order, wl.set_number
     """, (uid,)).fetchall()
     conn.close()
@@ -873,12 +905,12 @@ def export_csv():
         writer.writerow(list(r))
     filename = f"training_{datetime.now().strftime('%Y-%m-%d')}.csv"
     return Response(
-        "\ufeff" + output.getvalue(),
+        "" + output.getvalue(),
         mimetype="text/csv; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
-
-
+ 
+ 
 # ══════════════════════════════════════════════
 #  PUSH-УВЕДОМЛЕНИЯ (Web Push)
 # ══════════════════════════════════════════════
@@ -891,7 +923,7 @@ def check_reminder():
     uid = current_user_id()
     last = cur.execute("""
         SELECT workout_date FROM workout_log
-        WHERE (user_id = ? OR user_id IS NULL)
+        WHERE user_id = ?
         ORDER BY workout_date DESC LIMIT 1
     """, (uid,)).fetchone()
     conn.close()
@@ -904,8 +936,8 @@ def check_reminder():
         "last_date": last["workout_date"],
         "should_remind": days_since >= 3
     })
-
-
+ 
+ 
 @app.route("/last-workout-days")
 def last_workout_days():
     """Возвращает дни недели последних тренировок для отображения в статистике."""
@@ -915,13 +947,13 @@ def last_workout_days():
     uid = current_user_id()
     rows = cur.execute("""
         SELECT DISTINCT workout_date FROM workout_log
-        WHERE (user_id = ? OR user_id IS NULL)
+        WHERE user_id = ?
         ORDER BY workout_date DESC LIMIT 30
     """, (uid,)).fetchall()
     conn.close()
     return jsonify({"dates": [r["workout_date"] for r in rows]})
-
-
+ 
+ 
 @app.route("/personal-records")
 def personal_records():
     """Личные рекорды — максимальный вес по каждому упражнению за всё время."""
@@ -934,14 +966,14 @@ def personal_records():
         FROM workout_log wl
         JOIN exercises e ON e.id = wl.exercise_id
         WHERE wl.set_number > 0 AND wl.weight > 0
-          AND (wl.user_id = ? OR wl.user_id IS NULL)
+          AND wl.user_id = ?
         GROUP BY e.name
         ORDER BY e.name
     """, (uid,)).fetchall()
     conn.close()
     return jsonify({"records": [dict(r) for r in rows]})
-
-
+ 
+ 
 @app.route("/progress-by-name-grouped")
 def get_progress_grouped():
     """История подходов сгруппированная по датам."""
@@ -957,7 +989,7 @@ def get_progress_grouped():
         FROM workout_log wl
         JOIN exercises e ON e.id = wl.exercise_id
         WHERE e.name = ? AND wl.set_number > 0
-          AND (wl.user_id = ? OR wl.user_id IS NULL)
+          AND wl.user_id = ?
         ORDER BY wl.workout_date DESC, wl.set_number ASC
         LIMIT 100
     """, (name, uid)).fetchall()
@@ -971,8 +1003,8 @@ def get_progress_grouped():
             grouped[d] = []
         grouped[d].append(dict(r))
     return jsonify({"exercise_name": name, "grouped": [{"date": d, "sets": s} for d, s in grouped.items()]})
-
-
+ 
+ 
 @app.route("/progression-hints")
 def progression_hints():
     """Подсказки по прогрессии — анализирует последние оценки сложности."""
@@ -987,17 +1019,17 @@ def progression_hints():
         JOIN exercises e ON e.id = wl.exercise_id
         WHERE wl.set_number > 0
         AND wl.difficulty IS NOT NULL AND wl.difficulty != ''
-        AND (wl.user_id = ? OR wl.user_id IS NULL)
+        AND wl.user_id = ?
         AND wl.id IN (
             SELECT MAX(id) FROM workout_log
             WHERE set_number > 0 AND difficulty IS NOT NULL AND difficulty != ''
-              AND (user_id = ? OR user_id IS NULL)
+              AND user_id = ?
             GROUP BY exercise_id
         )
         ORDER BY e.name
     """, (uid, uid)).fetchall()
     conn.close()
-
+ 
     hints = {}
     for r in rows:
         diff = (r["difficulty"] or "").lower().strip()
@@ -1029,14 +1061,14 @@ def progression_hints():
                 "current_weight": weight,
                 "suggested_weight": weight
             }
-
+ 
     return jsonify({"hints": hints})
-
+ 
 # ══════════════════════════════════════════════
 #  AI-АНАЛИЗ (Yandex AI Studio — DeepSeek V3)
 # ══════════════════════════════════════════════
 import urllib.request, json as _json
-
+ 
 @app.route("/ai-analyze", methods=["POST"])
 def ai_analyze():
     require_auth()
@@ -1045,44 +1077,48 @@ def ai_analyze():
     sleep = data.get("sleep", None)
     energy = data.get("energy", None)
     stress = data.get("stress", None)
-
+ 
     conn = get_db()
     cur = conn.cursor()
-
+ 
     # Последняя тренировка
     uid = current_user_id()
     last_date_row = cur.execute("""
         SELECT MAX(workout_date) as last_date FROM workout_log
-        WHERE set_number > 0 AND (user_id = ? OR user_id IS NULL)
+        WHERE set_number > 0 AND user_id = ?
     """, (uid,)).fetchone()
     last_date = last_date_row["last_date"] if last_date_row else None
-
+ 
     # Определяем day_id последней тренировки
     last_day_id = None
     if last_date:
         r = cur.execute("""
             SELECT e.day_id FROM workout_log wl
             JOIN exercises e ON e.id = wl.exercise_id
-            WHERE wl.workout_date = ? AND wl.set_number > 0
+            WHERE wl.workout_date = ? AND wl.set_number > 0 AND wl.user_id = ?
             LIMIT 1
-        """, (last_date,)).fetchone()
+        """, (last_date, uid)).fetchone()
         if r:
             last_day_id = r["day_id"]
-
+ 
     # Данные последней тренировки
     last_sets = []
+    last_dur_min = None
     if last_date:
-        last_duration = cur.execute("SELECT MAX(duration_seconds) as dur FROM workout_log WHERE workout_date = ? AND (user_id = ? OR user_id IS NULL)", (last_date, uid)).fetchone()
+        last_duration = cur.execute(
+            "SELECT MAX(duration_seconds) as dur FROM workout_log WHERE workout_date = ? AND user_id = ?",
+            (last_date, uid)
+        ).fetchone()
         last_dur_min = round(last_duration["dur"] / 60) if last_duration and last_duration["dur"] else None
         last_sets = cur.execute("""
             SELECT e.name, wl.set_number, wl.weight, wl.reps, wl.difficulty
             FROM workout_log wl
             JOIN exercises e ON e.id = wl.exercise_id
             WHERE wl.workout_date = ? AND wl.set_number > 0
-              AND (wl.user_id = ? OR wl.user_id IS NULL)
+              AND wl.user_id = ?
             ORDER BY e.sort_order, wl.set_number
         """, (last_date, uid)).fetchall()
-
+ 
     # Предыдущая тренировка того же дня
     prev_sets = []
     if last_date and last_day_id:
@@ -1091,7 +1127,8 @@ def ai_analyze():
             FROM workout_log wl
             JOIN exercises e ON e.id = wl.exercise_id
             WHERE wl.workout_date < ? AND e.day_id = ? AND wl.set_number > 0
-        """, (last_date, last_day_id)).fetchone()
+              AND wl.user_id = ?
+        """, (last_date, last_day_id, uid)).fetchone()
         prev_date = prev_date_row["prev_date"] if prev_date_row else None
         if prev_date:
             prev_sets = cur.execute("""
@@ -1099,30 +1136,30 @@ def ai_analyze():
                 FROM workout_log wl
                 JOIN exercises e ON e.id = wl.exercise_id
                 WHERE wl.workout_date = ? AND wl.set_number > 0
-                  AND (wl.user_id = ? OR wl.user_id IS NULL)
+                  AND wl.user_id = ?
                 ORDER BY e.sort_order, wl.set_number
             """, (prev_date, uid)).fetchall()
-
+ 
     # Тоннаж по неделям за 30 дней
     weekly = cur.execute("""
         SELECT strftime('%Y-%W', workout_date) as week, SUM(weight * reps) as tonnage
         FROM workout_log WHERE set_number > 0
         AND workout_date >= date('now', '-30 days')
-        AND (user_id = ? OR user_id IS NULL)
+        AND user_id = ?
         GROUP BY week ORDER BY week
     """, (uid,)).fetchall()
-
+ 
     # Макс веса по упражнениям
     records = cur.execute("""
         SELECT e.name, MAX(wl.weight) as max_weight
         FROM workout_log wl
         JOIN exercises e ON e.id = wl.exercise_id
-        WHERE wl.set_number > 0 AND (wl.user_id = ? OR wl.user_id IS NULL)
+        WHERE wl.set_number > 0 AND wl.user_id = ?
         GROUP BY e.name
     """, (uid,)).fetchall()
-
+ 
     conn.close()
-
+ 
     # Форматируем данные
     def fmt_sets(sets):
         lines = []
@@ -1133,12 +1170,12 @@ def ai_analyze():
                 lines.append(cur_ex + ":")
             lines.append("  П" + str(r["set_number"]) + ": " + str(r["weight"]) + "кг x" + str(r["reps"]) + " (" + (r["difficulty"] or "-") + ")")
         return "\n".join(lines)
-
+ 
     last_summary = fmt_sets(last_sets) if last_sets else "нет данных"
     prev_summary = fmt_sets(prev_sets) if prev_sets else "нет данных"
     weekly_summary = ", ".join(["нед." + r["week"][-2:] + ": " + str(round(r["tonnage"])) + "кг" for r in weekly])
     records_summary = ", ".join([r["name"] + " " + str(r["max_weight"]) + "кг" for r in records])
-
+ 
     recovery = ""
     if sleep or energy or stress:
         recovery = (
@@ -1147,14 +1184,14 @@ def ai_analyze():
             + ("Энергия: " + str(energy) + "/5\n" if energy else "")
             + ("Стресс: " + str(stress) + "/5\n" if stress else "")
         )
-
+ 
     # Загружаем прошлые рекомендации
     conn2 = get_db()
     past_recs = conn2.execute("""
         SELECT workout_date, recommendation_text FROM ai_recommendations
         WHERE user_id = ? ORDER BY created_at DESC LIMIT 2
     """, (uid,)).fetchall()
-
+ 
     # Формируем блок памяти для промпта
     memory_block = ""
     if past_recs:
@@ -1165,7 +1202,7 @@ def ai_analyze():
             memory_block += f"Дата тренировки {rec['workout_date']}:\n{rec_short}\n---\n"
         memory_block += "Учти: выполнил ли пользователь прошлые рекомендации по весам — сравни с ПОСЛЕДНЕЙ ТРЕНИРОВКОЙ.\n"
     conn2.close()
-
+ 
     # Получаем профиль для AI
     conn2 = get_db()
     profile = conn2.execute("SELECT age, gender, weight_kg, height_cm, goal FROM users WHERE id=?", (uid,)).fetchone()
@@ -1177,7 +1214,7 @@ def ai_analyze():
         if profile["weight_kg"]: profile_str += f"Вес тела: {profile['weight_kg']} кг. "
         if profile["height_cm"]: profile_str += f"Рост: {profile['height_cm']} см. "
         if profile["goal"]: profile_str += f"Цель: {profile['goal']}. "
-
+ 
     # Динамика веса тела
     conn3 = get_db()
     bw_rows = conn3.execute("""
@@ -1188,7 +1225,7 @@ def ai_analyze():
     if bw_rows:
         bw_str = ", ".join([f"{r['log_date']}: {r['weight_kg']} кг" for r in reversed(bw_rows)])
         profile_str += f"Динамика веса: {bw_str}. "
-
+ 
     # Последние замеры тела
     conn4 = get_db()
     meas = conn4.execute("""
@@ -1205,7 +1242,7 @@ def ai_analyze():
         if last['hips_cm']: meas_str += f"бёдра {last['hips_cm']} см, "
         if last['bicep_cm']: meas_str += f"бицепс {last['bicep_cm']} см. "
         profile_str += meas_str
-
+ 
     prompt = (
         "Ты — персональный AI-тренер и спортивный врач. Тренируюсь 3 раза в неделю "
         "(день 1: верх, день 2: ноги+талия, день 3: верх). Цели: рост силы, контроль техники, профилактика травм.\n"
@@ -1255,7 +1292,7 @@ def ai_analyze():
         "- Один персональный совет на СЕГОДНЯ: конкретное действие с учётом профиля и самочувствия. Не упоминай 'анаболическое окно' и '30г белка сразу после' — это устаревшие рекомендации.\n\n"
         "ВАЖНО: все веса кратны 2.5. Таблицы строго в markdown. Только цифры и конкретика. Без слова 'может'."
     )
-
+ 
     try:
         payload = _json.dumps({
             "modelUri": "gpt://" + YANDEX_FOLDER_ID + "/yandexgpt",
@@ -1266,7 +1303,7 @@ def ai_analyze():
             },
             "messages": [{"role": "user", "text": prompt}]
         }).encode("utf-8")
-
+ 
         req = urllib.request.Request(
             "https://llm.api.cloud.yandex.net/foundationModels/v1/completion",
             data=payload,
@@ -1292,17 +1329,17 @@ def ai_analyze():
                 pass
             logger.info(f"AI_ANALYZE user_id={uid} date={last_date}")
             return jsonify({"status": "ok", "analysis": answer})
-
+ 
     except Exception as e:
         send_telegram(f"🔴 <b>Progressor AI Error</b>\n{str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
-
-
+ 
+ 
 # ══════════════════════════════════════════════
 #  RECOVERY — сохранение показателей самочувствия
 # ══════════════════════════════════════════════
-
-
+ 
+ 
 @app.route("/recovery", methods=["POST"])
 def save_recovery():
     require_auth()
@@ -1323,8 +1360,8 @@ def save_recovery():
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
-
-
+ 
+ 
 @app.route("/recovery-history")
 def recovery_history():
     require_auth()
@@ -1337,16 +1374,16 @@ def recovery_history():
                COALESCE(SUM(wl.weight * wl.reps), 0) as tonnage
         FROM recovery_log r
         LEFT JOIN workout_log wl ON wl.workout_date = r.log_date AND wl.set_number > 0
-          AND (wl.user_id = ? OR wl.user_id IS NULL)
-        WHERE (r.user_id = ? OR r.user_id IS NULL)
+          AND wl.user_id = ?
+        WHERE r.user_id = ?
         GROUP BY r.log_date
         ORDER BY r.log_date DESC
         LIMIT 30
     """, (uid, uid)).fetchall()
     conn.close()
     return jsonify({"history": [dict(r) for r in rows]})
-
-
+ 
+ 
 # ══════════════════════════════════════════════
 #  PR-СИСТЕМА — личные рекорды при сохранении
 # ══════════════════════════════════════════════
@@ -1358,10 +1395,10 @@ def check_pr():
     date = data.get("date")
     if not date:
         abort(400)
-
+ 
     conn = get_db()
     cur = conn.cursor()
-
+ 
     # Рекорды из последней тренировки
     uid = current_user_id()
     new_records = cur.execute("""
@@ -1372,10 +1409,10 @@ def check_pr():
         FROM workout_log wl
         JOIN exercises e ON e.id = wl.exercise_id
         WHERE wl.workout_date = ? AND wl.set_number > 0
-          AND (wl.user_id = ? OR wl.user_id IS NULL)
+          AND wl.user_id = ?
         GROUP BY e.name
     """, (date, uid)).fetchall()
-
+ 
     prs = []
     for r in new_records:
         # Предыдущий рекорд веса для этого упражнения
@@ -1385,9 +1422,9 @@ def check_pr():
             FROM workout_log wl
             JOIN exercises e ON e.id = wl.exercise_id
             WHERE e.name = ? AND wl.workout_date < ? AND wl.set_number > 0
-              AND (wl.user_id = ? OR wl.user_id IS NULL)
+              AND wl.user_id = ?
         """, (r["name"], date, uid)).fetchone()
-
+ 
         if prev and prev["prev_max_weight"]:
             if r["max_weight"] > prev["prev_max_weight"]:
                 prs.append({
@@ -1403,12 +1440,12 @@ def check_pr():
                     "old": prev["prev_max_reps"],
                     "new": r["max_reps"]
                 })
-
+ 
     conn.close()
     return jsonify({"prs": prs})
-
-
-
+ 
+ 
+ 
 @app.route("/ai-history")
 def ai_history():
     require_auth()
@@ -1422,8 +1459,8 @@ def ai_history():
     """, (current_user_id(),)).fetchall()
     conn.close()
     return jsonify({"history": [dict(r) for r in rows]})
-
-
+ 
+ 
 @app.route("/progress-summary")
 def progress_summary():
     require_auth()
@@ -1440,11 +1477,11 @@ def progress_summary():
     if cache and cache["last_workout_date"] == last_date:
         conn.close()
         return jsonify({"status": "ok", "summary": cache["summary_text"], "cached": True})
-
+ 
     # Даты — 8 недель назад
     from datetime import date, timedelta
     eight_weeks_ago = (date.today() - timedelta(weeks=8)).isoformat()
-
+ 
     # Тренировки за 8 недель
     workouts = conn.execute("""
         SELECT COUNT(DISTINCT workout_date) as count,
@@ -1454,7 +1491,7 @@ def progress_summary():
         FROM workout_log
         WHERE user_id = ? AND set_number > 0 AND workout_date >= ?
     """, (uid, eight_weeks_ago)).fetchone()
-
+ 
     # Прирост по упражнениям
     exercise_progress = conn.execute("""
         SELECT e.name,
@@ -1469,7 +1506,7 @@ def progress_summary():
         ORDER BY gain DESC
         LIMIT 5
     """, (uid, eight_weeks_ago)).fetchall()
-
+ 
     # Тоннаж первые 4 недели vs последние 4 недели
     four_weeks_ago = (date.today() - timedelta(weeks=4)).isoformat()
     tonnage_first = conn.execute("""
@@ -1481,7 +1518,7 @@ def progress_summary():
         SELECT COALESCE(SUM(weight * reps), 0) as t FROM workout_log
         WHERE user_id = ? AND set_number > 0 AND workout_date >= ?
     """, (uid, four_weeks_ago)).fetchone()["t"]
-
+ 
     # Вес тела — первое и последнее значение
     bw_first = conn.execute("""
         SELECT weight_kg FROM body_weight WHERE user_id = ?
@@ -1491,7 +1528,7 @@ def progress_summary():
         SELECT weight_kg FROM body_weight WHERE user_id = ?
         ORDER BY log_date DESC LIMIT 1
     """, (uid,)).fetchone()
-
+ 
     # Замеры — первые и последние
     meas_first = conn.execute("""
         SELECT * FROM body_measurements WHERE user_id = ?
@@ -1501,13 +1538,13 @@ def progress_summary():
         SELECT * FROM body_measurements WHERE user_id = ?
         ORDER BY log_date DESC LIMIT 1
     """, (uid,)).fetchone()
-
+ 
     # Профиль
     profile = conn.execute(
         "SELECT age, gender, weight_kg, height_cm, goal FROM users WHERE id=?", (uid,)
     ).fetchone()
     conn.close()
-
+ 
     # Формируем данные для AI
     profile_str = ""
     if profile:
@@ -1515,13 +1552,13 @@ def progress_summary():
         if profile["gender"]: profile_str += f"Пол: {profile['gender']}. "
         if profile["height_cm"]: profile_str += f"Рост: {profile['height_cm']} см. "
         if profile["goal"]: profile_str += f"Цель: {profile['goal']}. "
-
+ 
     bw_change = ""
     if bw_first and bw_last:
         diff = round(bw_last["weight_kg"] - bw_first["weight_kg"], 1)
         sign = "+" if diff > 0 else ""
         bw_change = f"Вес тела: {bw_first['weight_kg']} → {bw_last['weight_kg']} кг ({sign}{diff} кг). "
-
+ 
     meas_change = ""
     if meas_first and meas_last:
         parts = []
@@ -1531,12 +1568,12 @@ def progress_summary():
                 sign = "+" if diff > 0 else ""
                 parts.append(f"{name}: {sign}{diff} см")
         if parts: meas_change = "Замеры: " + ", ".join(parts) + ". "
-
+ 
     ex_str = ""
     for r in exercise_progress:
         if r["gain"] > 0:
             ex_str += f"{r['name']}: +{r['gain']} кг. "
-
+ 
     tonnage_change = ""
     if tonnage_last > 0:
         if tonnage_first > 0:
@@ -1545,37 +1582,37 @@ def progress_summary():
             tonnage_change = f"Тоннаж: первые 4 нед {round(tonnage_first)} кг → последние 4 нед {round(tonnage_last)} кг ({sign}{pct}%). "
         else:
             tonnage_change = f"Тоннаж за последние 4 недели: {round(tonnage_last)} кг (данные за первые 4 нед отсутствуют). "
-
+ 
     prompt = f"""Ты — AI-тренер приложения Progressor. Составь краткий отчёт о прогрессе пользователя за последние 8 недель.
-
+ 
 ПРОФИЛЬ: {profile_str}
 ТРЕНИРОВКИ: {workouts['count'] if workouts else 0} тренировок за 8 недель ({workouts['first_date'] if workouts else '?'} — {workouts['last_date'] if workouts else '?'}).
 {bw_change}{meas_change}{ex_str}{tonnage_change}
-
+ 
 Ответ строго в формате:
-
+ 
 **📊 Сводка прогресса за 8 недель**
-
+ 
 **Индекс прогресса: X/100**
 Одно предложение что означает этот индекс.
-
+ 
 **Ключевые достижения:**
 - 3-4 конкретных факта с цифрами
-
+ 
 **Состав тела:**
 - Изменение веса и замеров с интерпретацией
-
+ 
 **Силовой прогресс:**
 - Топ-3 упражнения с приростом
-
+ 
 **Тоннаж:**
 - Динамика за период
-
+ 
 **Вывод AI:**
 Один абзац — стал ли пользователь лучше, что работает, что требует внимания.
-
+ 
 ВАЖНО: только факты из данных. Без слов "возможно", "может быть". Все цифры из данных."""
-
+ 
     try:
         import urllib.request, json as _json
         payload = _json.dumps({
@@ -1611,26 +1648,26 @@ def progress_summary():
     except Exception as e:
         send_telegram(f"🔴 <b>Progressor Summary Error</b>\n{str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
-
-
-
+ 
+ 
+ 
 @app.route("/achievements")
 def get_achievements():
     require_auth()
     uid = current_user_id()
     conn = get_db()
     from datetime import date, timedelta
-
+ 
     # 1. Первая тренировка
     first_workout = conn.execute(
         "SELECT MIN(workout_date) as d FROM workout_log WHERE user_id=? AND set_number>0", (uid,)
     ).fetchone()
-
+ 
     # 2. Всего тренировок
     total_workouts = conn.execute(
         "SELECT COUNT(DISTINCT workout_date) as c FROM workout_log WHERE user_id=? AND set_number>0", (uid,)
     ).fetchone()["c"]
-
+ 
     # 3. Первый PR (упражнение с ростом веса)
     pr = conn.execute("""
         SELECT MIN(workout_date) as d FROM (
@@ -1643,7 +1680,7 @@ def get_achievements():
             AND workout_date < t1.workout_date AND set_number>0
         )
     """, (uid, uid)).fetchone()
-
+ 
     # 4. Consistency — 4 недели подряд
     dates = [r["workout_date"] for r in conn.execute(
         "SELECT DISTINCT workout_date FROM workout_log WHERE user_id=? AND set_number>0 ORDER BY workout_date", (uid,)
@@ -1667,7 +1704,7 @@ def get_achievements():
                     break
             else:
                 streak = 1
-
+ 
     # 5. Volume Builder — +10% тоннажа (сравниваем первую и последнюю неделю)
     volume_date = None
     weekly = conn.execute("""
@@ -1680,24 +1717,24 @@ def get_achievements():
         last_t = weekly[-1]["t"] or 0
         if first_t > 0 and last_t >= first_t * 1.1:
             volume_date = dates[-1] if dates else None
-
+ 
     # 6. Weight Tracker
     bw = conn.execute(
         "SELECT MIN(log_date) as d FROM body_weight WHERE user_id=?", (uid,)
     ).fetchone()
-
+ 
     # 7. Measurement Tracker
     meas = conn.execute(
         "SELECT MIN(log_date) as d FROM body_measurements WHERE user_id=?", (uid,)
     ).fetchone()
-
+ 
     # 8. AI Follower — первый AI анализ
     ai = conn.execute(
         "SELECT MIN(created_at) as d FROM ai_recommendations WHERE user_id=?", (uid,)
     ).fetchone()
-
+ 
     conn.close()
-
+ 
     badges = [
         {"id": "first_workout",   "icon": "🏋️", "name": "Первая тренировка",       "desc": "Первая тренировка в Progressor",     "earned": bool(first_workout and first_workout["d"]), "date": first_workout["d"] if first_workout else None},
         {"id": "progress_champ",  "icon": "🏆", "name": "Чемпион прогресса",    "desc": "10 тренировок выполнено",            "earned": total_workouts >= 10, "date": dates[9] if total_workouts >= 10 and len(dates) >= 10 else None},
@@ -1708,12 +1745,12 @@ def get_achievements():
         {"id": "meas_tracker",    "icon": "📏", "name": "Замеры тела",  "desc": "Первые замеры тела",                 "earned": bool(meas and meas["d"]), "date": meas["d"] if meas else None},
         {"id": "ai_follower",     "icon": "🧠", "name": "Следую AI",          "desc": "Первый AI анализ получен",           "earned": bool(ai and ai["d"]), "date": str(ai["d"])[:10] if ai and ai["d"] else None},
     ]
-
+ 
     earned = sum(1 for b in badges if b["earned"])
     score = round(earned / len(badges) * 100)
-
+ 
     return jsonify({"status": "ok", "badges": badges, "score": score, "earned": earned, "total": len(badges)})
-
+ 
 @app.route("/admin/verify-user/<int:user_id>", methods=["POST"])
 def admin_verify_user(user_id):
     require_admin()
@@ -1722,8 +1759,8 @@ def admin_verify_user(user_id):
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
-
-
+ 
+ 
 @app.route("/delete-account", methods=["POST"])
 def delete_account():
     require_auth()
@@ -1740,12 +1777,13 @@ def delete_account():
     conn.execute("DELETE FROM body_weight WHERE user_id=?", (uid,))
     conn.execute("DELETE FROM body_measurements WHERE user_id=?", (uid,))
     conn.execute("DELETE FROM ai_recommendations WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM exercises WHERE user_id=?", (uid,))
     conn.execute("DELETE FROM users WHERE id=?", (uid,))
     conn.commit()
     conn.close()
     session.clear()
     return jsonify({"status": "ok"})
-
+ 
 # ══════════════════════════════════════════════
 #  ДЕМО-РЕЖИМ
 # ══════════════════════════════════════════════
@@ -1781,8 +1819,8 @@ def restore_backup():
     except Exception as e:
         logger.error(f"RESTORE_ERROR user_id={current_user_id()} {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
-
-
+ 
+ 
 @app.route("/load-demo", methods=["POST"])
 def load_demo():
     """Загружает красивые демо-данные для питча."""
@@ -1795,15 +1833,15 @@ def load_demo():
         shutil.copy2("training.db", pre_demo)
     conn = get_db()
     cur = conn.cursor()
-
+ 
     # Очищаем лог только для текущего пользователя
     uid = current_user_id()
     cur.execute("DELETE FROM workout_log WHERE user_id = ?", (uid,))
-
+ 
     # Генерируем 8 недель красивых данных с прогрессом
     from datetime import date, timedelta
     import random
-
+ 
     # Дни тренировок — понедельник, среда, пятница
     start = date.today() - timedelta(weeks=8)
     workout_days = []
@@ -1812,54 +1850,54 @@ def load_demo():
         if d.weekday() in [0, 2, 4]:  # пн, ср, пт
             workout_days.append(d)
         d += timedelta(days=1)
-
-    # Упражнения с прогрессирующими весами
+ 
+    # Упражнения с прогрессирующими весами — поиск по имени и user_id
     day1_exercises = [
-        (1, [32.5, 35, 37.5, 40]),      # Тяга верхнего блока
-        (2, [30, 32.5, 35, 37.5]),      # Жим плечами
-        (3, [32.5, 35, 37.5, 40]),      # Жим грудью
-        (5, [15, 17.5, 17.5, 20]),      # Обратная бабочка
-        (6, [17.5, 20, 20, 20]),        # Бицепс
-        (7, [0, 5, 5, 5]),              # Пресс
+        ("Тяга верхнего блока",             [32.5, 35, 37.5, 40]),
+        ("Жим плечами (дельтоидный)",        [30, 32.5, 35, 37.5]),
+        ("Вертикальный жим грудью",           [32.5, 35, 37.5, 40]),
+        ("Обратная бабочка (задние дельты)",  [15, 17.5, 17.5, 20]),
+        ("Сгибание рук (бицепс)",             [17.5, 20, 20, 20]),
+        ("Пресс",                             [0, 5, 5, 5]),
     ]
     day2_exercises = [
-        (8, [30, 32.5, 35, 37.5]),      # Разгибание ног
-        (9, [25, 27.5, 30, 32.5]),      # Сгибание ног
-        ("Горизонтальный жим ногами", [60, 65, 70, 75]),  # Жим ногами
-        (10, [30, 32.5, 35, 35]),       # Приводящая
-        (11, [35, 37.5, 40, 40]),       # Отводящая
+        ("Разгибание ног",                    [30, 32.5, 35, 37.5]),
+        ("Сгибание ног",                      [25, 27.5, 30, 32.5]),
+        ("Горизонтальный жим ногами",         [60, 65, 70, 75]),
+        ("Приводящая машина",                 [30, 32.5, 35, 35]),
+        ("Отводящая машина",                  [35, 37.5, 40, 40]),
     ]
     day3_exercises = [
-        (14, [30, 32.5, 35, 37.5]),     # Жим плечами
-        (15, [35, 37.5, 40, 40]),       # Тяга узкий хват
-        (16, [35, 37.5, 40, 40]),       # Жим грудью
-        (17, [30, 32.5, 35, 35]),       # Тяга к поясу
-        (18, [10, 12.5, 15, 15]),       # Трицепс
-        (19, [0, 5, 5, 5]),             # Пресс
+        ("Жим плечами (дельтоидный)",         [30, 32.5, 35, 37.5]),
+        ("Тяга верхнего блока (узкий хват)",  [35, 37.5, 40, 40]),
+        ("Вертикальный жим грудью",           [35, 37.5, 40, 40]),
+        ("Тяга блока к поясу",                [30, 32.5, 35, 35]),
+        ("Разгибание на трицепс",             [10, 12.5, 15, 15]),
+        ("Пресс",                             [0, 5, 5, 5]),
     ]
-
+ 
     difficulties = ['Легко', 'Легко', 'Сложно', 'Тяжело', 'Сложно']
     day_cycle = [day1_exercises, day2_exercises, day3_exercises]
     day_ids = [1, 2, 3]
-
+ 
     for i, workout_date in enumerate(workout_days):
         day_idx = i % 3
         exercises = day_cycle[day_idx]
         week_num = i // 3
         # Прогресс — каждые 2 недели +2.5 кг
         progress = (week_num // 2) * 2.5
-
-        for ex_id, base_weights in exercises:
-            if isinstance(ex_id, str):
-                ex = cur.execute("SELECT id, plan_sets FROM exercises WHERE name=?", (ex_id,)).fetchone()
-                if ex: ex_id = ex["id"]
-            else:
-                ex = cur.execute("SELECT id, plan_sets FROM exercises WHERE id=?", (ex_id,)).fetchone()
+ 
+        for ex_name, base_weights in exercises:
+            # Ищем упражнение по имени в личной программе пользователя
+            ex = cur.execute(
+                "SELECT id, plan_sets FROM exercises WHERE name = ? AND user_id = ? LIMIT 1",
+                (ex_name, uid)
+            ).fetchone()
             if not ex:
                 continue
             plan_sets = ex["plan_sets"]
             diff = difficulties[week_num % len(difficulties)]
-
+ 
             for set_num in range(1, plan_sets + 1):
                 w_idx = min(set_num - 1, len(base_weights) - 1)
                 weight = max(0, base_weights[w_idx] + progress)
@@ -1868,18 +1906,18 @@ def load_demo():
                     reps = random.choice([10, 11, 12])
                 else:
                     reps = random.choice([11, 12, 12, 13])
-
+ 
                 cur.execute("""
                     INSERT INTO workout_log
                     (user_id, exercise_id, workout_date, set_number, weight, reps, difficulty)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (uid, ex_id, workout_date.isoformat(), set_num, weight, reps, diff))
-
+                """, (uid, ex["id"], workout_date.isoformat(), set_num, weight, reps, diff))
+ 
     conn.commit()
     conn.close()
     return jsonify({"status": "ok", "workouts": len(workout_days)})
-
-
+ 
+ 
 @app.route("/workout-history")
 def workout_history():
     """Список всех тренировок с деталями."""
@@ -1893,11 +1931,11 @@ def workout_history():
         FROM workout_log wl
         JOIN exercises e ON e.id = wl.exercise_id
         JOIN day_templates dt ON dt.id = e.day_id
-        WHERE wl.set_number > 0 AND (wl.user_id = ? OR wl.user_id IS NULL)
+        WHERE wl.set_number > 0 AND wl.user_id = ?
         ORDER BY wl.workout_date DESC
         LIMIT 50
     """, (uid,)).fetchall()
-
+ 
     result = []
     for d in dates:
         # Получаем упражнения за этот день
@@ -1905,16 +1943,16 @@ def workout_history():
             SELECT e.name, wl.set_number, wl.weight, wl.reps, wl.difficulty,
                    0 as ex_tonnage,
                    (SELECT MAX(duration_seconds) FROM workout_log
-                    WHERE workout_date = ? AND (user_id = ? OR user_id IS NULL)) as duration_seconds
+                    WHERE workout_date = ? AND user_id = ?) as duration_seconds
             FROM workout_log wl
             JOIN exercises e ON e.id = wl.exercise_id
             WHERE wl.workout_date = ? AND e.day_id = ? AND wl.set_number > 0
-              AND (wl.user_id = ? OR wl.user_id IS NULL)
+              AND wl.user_id = ?
             ORDER BY e.sort_order, wl.set_number
         """, (d["workout_date"], uid, d["workout_date"], d["day_id"], uid)).fetchall()
-
+ 
         total_tonnage = sum(r["weight"] * r["reps"] for r in sets)
-
+ 
         # Группируем по упражнению
         exercises = {}
         for s in sets:
@@ -1926,23 +1964,23 @@ def workout_history():
                 "reps": s["reps"],
                 "difficulty": s["difficulty"]
             })
-
+ 
         result.append({
             "date": d["workout_date"],
             "day_name": d["day_name"],
             "total_tonnage": round(total_tonnage),
             "exercises": exercises
         })
-
+ 
     conn.close()
     return jsonify({"history": result})
-
+ 
 @app.errorhandler(500)
 def handle_500(e):
     logger.error(f"500 ERROR: {str(e)}")
     send_telegram(f"🔴 <b>Progressor 500</b>\n{str(e)}")
     return jsonify({"status": "error", "message": "Внутренняя ошибка"}), 500
-
+ 
 @app.errorhandler(Exception)
 def handle_exception(e):
     if hasattr(e, 'code') and e.code < 500:

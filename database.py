@@ -1,16 +1,16 @@
 import sqlite3
-
+ 
 DB_NAME = "training.db"
-
+ 
 def get_db():
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
-
+ 
 def init_db():
     conn = get_db()
     cur = conn.cursor()
-
+ 
     # ── Пользователи ──────────────────────────────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -25,7 +25,7 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-
+ 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS day_templates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,10 +33,14 @@ def init_db():
             sort_order INTEGER
         )
     """)
+ 
+    # exercises: user_id — кому принадлежат упражнения.
+    # NULL = системный шаблон (используется как эталон для копирования).
     cur.execute("""
         CREATE TABLE IF NOT EXISTS exercises (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             day_id INTEGER NOT NULL,
+            user_id INTEGER,
             name TEXT NOT NULL,
             machine_model TEXT,
             plan_sets INTEGER,
@@ -44,9 +48,11 @@ def init_db():
             default_weight REAL,
             rest_seconds INTEGER,
             sort_order INTEGER,
-            FOREIGN KEY (day_id) REFERENCES day_templates(id)
+            FOREIGN KEY (day_id) REFERENCES day_templates(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
+ 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS workout_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,7 +69,7 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
-
+ 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS recovery_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,8 +83,7 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
-
-    # Индексы для производительности
+ 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS ai_recommendations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,20 +94,29 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
+ 
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_rec_user ON ai_recommendations(user_id, workout_date)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_workout_user_date ON workout_log(user_id, workout_date)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_workout_exercise ON workout_log(exercise_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_recovery_user ON recovery_log(user_id)")
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_recovery_user_date ON recovery_log(user_id, log_date)")
-
-    # Добавляем duration_seconds если нет
+ 
+    # ── Миграции ────────────────────────────────────────────────
+ 
+    # workout_log: duration_seconds
     try:
         cur.execute("ALTER TABLE workout_log ADD COLUMN duration_seconds INTEGER")
     except Exception:
         pass
-
-    # Добавляем user_id в workout_log если его ещё нет (миграция)
-    # Добавляем поля профиля если нет
+ 
+    # exercises: user_id — ключевая миграция для мульти-пользователей
+    try:
+        cur.execute("ALTER TABLE exercises ADD COLUMN user_id INTEGER REFERENCES users(id)")
+    except Exception:
+        pass
+ 
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_exercises_user ON exercises(user_id, day_id)")
+ 
     # Таблица веса тела
     cur.execute("""
         CREATE TABLE IF NOT EXISTS body_weight (
@@ -116,7 +130,7 @@ def init_db():
         )
     """)
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_body_weight_user_date ON body_weight(user_id, log_date)")
-
+ 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS body_measurements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -133,24 +147,23 @@ def init_db():
         )
     """)
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_measurements_user_date ON body_measurements(user_id, log_date)")
-
-    for col, typ in [("age", "INTEGER"), ("gender", "TEXT"), ("weight_kg", "REAL"), ("goal", "TEXT"), ("height_cm", "INTEGER")]:
+ 
+    for col, typ in [("age", "INTEGER"), ("gender", "TEXT"), ("weight_kg", "REAL"), ("goal", "TEXT"), ("height_cm", "INTEGER"), ("is_admin", "INTEGER DEFAULT 0")]:
         try:
             cur.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
         except Exception:
             pass
-
+ 
     try:
         cur.execute("ALTER TABLE workout_log ADD COLUMN user_id INTEGER REFERENCES users(id)")
     except Exception:
-        pass  # Колонка уже есть
-
-    # Добавляем user_id в recovery_log если есть (миграция)
+        pass
+ 
     try:
         cur.execute("ALTER TABLE recovery_log ADD COLUMN user_id INTEGER REFERENCES users(id)")
     except Exception:
         pass
-
+ 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS progress_summary_cache (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,13 +174,16 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
+ 
     conn.commit()
     conn.close()
-
+ 
+ 
 def seed():
+    """Засевает системные шаблоны дней и упражнений (user_id=NULL = системный эталон)."""
     conn = get_db()
     cur = conn.cursor()
-
+ 
     days = [
         (1, "День 1 – ВЕРХ (ширина спины, плечи, грудь)", 1),
         (2, "День 2 – НОГИ + ТАЛИЯ", 2),
@@ -178,7 +194,7 @@ def seed():
             "INSERT OR IGNORE INTO day_templates (id, name, sort_order) VALUES (?, ?, ?)",
             (day_id, name, sort)
         )
-
+ 
     exercises = [
         # День 1
         (1, "Тяга верхнего блока",             "№30", 4, "8–12",  40.0,  90, 1),
@@ -201,7 +217,7 @@ def seed():
         (3, "Тяга верхнего блока (узкий хват)",  "№30", 3, "10–12", 40.0,  90, 2),
         (3, "Вертикальный жим грудью",           "№28", 3, "10–12", 40.0,  90, 3),
         (3, "Тяга блока к поясу",                "№26", 3, "10–12", 35.0,  90, 4),
-        (3, "Разгибание на трицепс", "№14", 2, "10–12", 10.0,  60, 5),
+        (3, "Разгибание на трицепс",             "№14", 2, "10–12", 10.0,  60, 5),
         (3, "Пресс",                             "—",   3, "12–15",  5.0,  60, 6),
     ]
     for ex in exercises:
@@ -211,10 +227,56 @@ def seed():
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             ex
         )
-
+ 
     conn.commit()
     conn.close()
-
+ 
+ 
+def seed_user(user_id):
+    """
+    Копирует системные упражнения (user_id IS NULL) новому пользователю.
+    Идемпотентна: если у пользователя уже есть свои упражнения — ничего не делает.
+ 
+    Архитектура:
+        exercises WHERE user_id IS NULL  — системные шаблоны (эталон)
+        exercises WHERE user_id = <id>   — личная копия пользователя
+ 
+    При переходе на Вариант 2 (библиотека + программы) эта функция
+    заменяется на создание записей в WorkoutTemplate + ProgramExercise.
+    """
+    conn = get_db()
+    cur = conn.cursor()
+ 
+    # Идемпотентность: уже засеяно — выходим
+    existing = cur.execute(
+        "SELECT id FROM exercises WHERE user_id = ? LIMIT 1", (user_id,)
+    ).fetchone()
+    if existing:
+        conn.close()
+        return
+ 
+    # Копируем системные упражнения для каждого дня
+    system_exercises = cur.execute(
+        "SELECT day_id, name, machine_model, plan_sets, plan_reps_range, "
+        "default_weight, rest_seconds, sort_order "
+        "FROM exercises WHERE user_id IS NULL ORDER BY day_id, sort_order"
+    ).fetchall()
+ 
+    for ex in system_exercises:
+        cur.execute(
+            "INSERT INTO exercises "
+            "(user_id, day_id, name, machine_model, plan_sets, plan_reps_range, "
+            "default_weight, rest_seconds, sort_order) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, ex["day_id"], ex["name"], ex["machine_model"],
+             ex["plan_sets"], ex["plan_reps_range"], ex["default_weight"],
+             ex["rest_seconds"], ex["sort_order"])
+        )
+ 
+    conn.commit()
+    conn.close()
+ 
+ 
 if __name__ == "__main__":
     init_db()
     seed()
