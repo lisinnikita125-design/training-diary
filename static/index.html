@@ -13,14 +13,7 @@
     <link rel="apple-touch-icon" href="/icon-192.png">
     <meta name="theme-color" content="#0f1117">
     
-<div id="tab-achievements" class="tab hidden">
-  <h2 style="margin-bottom:16px">🏆 Достижения</h2>
-  <div id="achievements-score-bar" style="margin-bottom:20px"></div>
-  <div id="achievements-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px"></div>
 
-  <h2 style="margin:28px 0 16px">📋 Личные рекорды</h2>
-  <div id="prs-list"></div>
-</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <title>Progressor — AI-тренер</title>
@@ -230,6 +223,7 @@
         .nav-tab { flex:1; padding:8px; font-size:13px; font-weight:600; border:none; border-radius:7px; background:none; color:var(--text2); cursor:pointer; }
         .nav-tab.active { background:linear-gradient(135deg,#1a8a4a,#2ecc71); color:white; box-shadow:0 2px 8px rgba(46,204,113,0.3); }
     </style>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
@@ -596,10 +590,10 @@
         <div class="section">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
                 <h2 style="margin:0;">🏆 Мой прогресс</h2>
-                <button class="btn-primary btn-sm" onclick="const m=document.getElementById('progressSummaryLoaded');if(m)m.remove();loadAiHistory()">🔍 Обновить</button>
+                
             </div>
 
-            <div style="margin-bottom:16px"><button id="ai-trigger-btn" onclick="triggerAiAnalysis()" style="width:100%;padding:14px;font-size:16px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:10px;cursor:pointer">🤖 Запустить AI-анализ</button></div>
+            <div style="margin-bottom:16px"><button id="ai-trigger-btn" onclick="triggerAiAnalysis()" class="btn-primary" style="width:100%;padding:14px;font-size:16px;">🤖 Запустить AI-анализ</button></div>
             <p style="font-size:13px;color:var(--text2);margin:0 0 16px 0;">AI-сводка прогресса за последние 8 недель на основе тренировок, веса тела и замеров.</p>
 
             <div id="progressLoading" class="hidden" style="text-align:center;padding:24px;color:var(--text2);">
@@ -618,6 +612,16 @@
             </div>
         </div>
     </div>
+        <!-- ═══ ДОСТИЖЕНИЯ ═══ -->
+        <div id="tab-achievements" class="hidden">
+          <div class="section">
+            <div id="achievements-score-bar" style="margin-bottom:20px"></div>
+            <div id="achievements-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px"></div>
+            <h2 style="margin:24px 0 12px">📋 Личные рекорды</h2>
+            <div id="prs-list"></div>
+          </div>
+        </div>
+
 
 </div>
 
