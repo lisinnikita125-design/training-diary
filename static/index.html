@@ -12,7 +12,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="apple-touch-icon" href="/icon-192.png">
     <meta name="theme-color" content="#0f1117">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+<div id="tab-achievements" class="tab" style="display:none">
+  <h2 style="margin-bottom:16px">🏆 Достижения</h2>
+  <div id="achievements-score-bar" style="margin-bottom:20px"></div>
+  <div id="achievements-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px"></div>
+
+  <h2 style="margin:28px 0 16px">📋 Личные рекорды</h2>
+  <div id="prs-list"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <title>Progressor — AI-тренер</title>
     <style>
         * { box-sizing: border-box; }
@@ -34,7 +44,7 @@
             --green:#27ae60; --gl:#f0fff5; --gm:#d5f5e3; --border:#e0e4ef;
             --shadow:0 2px 8px rgba(0,0,0,0.08);
         }
-        body { font-family:'Inter','Helvetica Neue',Arial,sans-serif; max-width:860px; margin:0 auto; padding:12px; background:var(--bg); color:var(--text); transition:background .2s,color .2s; }
+        body { font-family:'Inter','Helvetica Neue',Arial,sans-serif; max-width:860px; margin:0 auto; padding:12px; background:var(--bg); color:var(--text); transition:background .2s,color .2s; overscroll-behavior: none; }
 
         /* Экран входа */
         #loginScreen { position:fixed; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:var(--bg); gap:14px; z-index:500; padding:20px; }
@@ -66,7 +76,7 @@
         .btn-danger { background:#ffebee; color:#c62828; }
         body.dark .btn-danger { background:#3e1a1a; color:#ef9a9a; }
         .theme-toggle { background:none; border:1.5px solid var(--border); border-radius:20px; padding:6px 12px; font-size:14px; color:var(--text2); cursor:pointer; }
-        .btn-sm { padding:4px 10px; font-size:13px; }
+        .btn-sm { padding:4px 10px; font-size:14px; }
 
         /* Таблица */
         .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
@@ -77,13 +87,13 @@
 
         .set-weight,.set-input { width:48px; padding:5px 3px; font-size:14px; text-align:center; border:1.5px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); -webkit-appearance:none; }
         .set-weight:focus,.set-input:focus { outline:none; border-color:var(--green); }
-        .difficulty-input { width:86px; padding:5px 6px; font-size:13px; border:1.5px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); }
+        .difficulty-input { width:86px; padding:5px 6px; font-size:14px; border:1.5px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); }
         .difficulty-input:focus { outline:none; border-color:var(--green); }
         .set-cell-disabled { color:var(--border); font-size:16px; }
         .tonazh-cell { font-weight:700; color:#e31e24; white-space:nowrap; }
-        .ex-name { text-align:left; font-weight:500; min-width:110px; font-size:13px; }
-        .ex-model { color:var(--text2); font-size:12px; }
-        .prev-info { font-size:11px; color:var(--text2); display:block; margin-top:2px; }
+        .ex-name { text-align:left; font-weight:500; min-width:110px; font-size:14px; }
+        .ex-model { color:var(--text2); font-size:13px; }
+        .prev-info { font-size:12px; color:var(--text2); display:block; margin-top:2px; }
 
         /* Таймер */
         .timer-cell { white-space:nowrap; min-width:80px; }
@@ -97,8 +107,8 @@
         /* Пропуск упражнения */
         .skip-row td { background:#fff8e1 !important; }
         body.dark .skip-row td { background:#2a2510 !important; }
-        .skip-badge { font-size:11px; color:#e65100; font-weight:600; display:block; }
-        .skip-reason { font-size:11px; color:var(--text2); }
+        .skip-badge { font-size:12px; color:#e65100; font-weight:600; display:block; }
+        .skip-reason { font-size:12px; color:var(--text2); }
 
         /* Глобальный таймер */
         #timerBanner { position:fixed; top:0; left:0; right:0; background:linear-gradient(135deg, #c01820, #e31e24); color:white; text-align:center; padding:10px; font-size:18px; font-weight:700; z-index:200; transform:translateY(-100%); transition:transform .3s; cursor:pointer; }
@@ -305,7 +315,8 @@
     <div class="nav-tabs">
         <button class="nav-tab active" onclick="showTab('workout')">🏋️</button>
         <button class="nav-tab" onclick="showTab('history')">📋</button>
-        <button class="nav-tab" onclick="showTab('progress')">📈</button>
+        <button class="nav-tab" onclick="showTab('achievements')">🏆</button>
+          <button class="nav-tab" onclick="showTab('progress')">📈</button>
         <button class="nav-tab" onclick="showTab('compare')">⚖️</button>
         <button class="nav-tab" onclick="showTab('stats')">📊</button>
         <button class="nav-tab" onclick="showTab('ai')">🤖</button>
@@ -364,6 +375,13 @@
 
     <!-- ═══ ПРОГРЕСС ═══ -->
     <div id="tab-progress" class="hidden">
+  <div style="margin-bottom:20px">
+    <button id="ai-trigger-btn" onclick="triggerAiAnalysis()"
+      style="width:100%;padding:14px;font-size:16px;font-weight:600;
+             background:var(--accent);color:#fff;border:none;border-radius:10px;cursor:pointer">
+      🤖 Запустить AI-анализ
+    </button>
+  </div>
         <div class="section">
             <div class="progress-controls">
                 <select id="exerciseSelect"></select>
@@ -495,7 +513,7 @@
             <div id="trainingCalendar" style="margin-top:16px;">
                 <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:8px;">Последние 4 недели</div>
                 <div id="calendarGrid" style="display:grid;grid-template-columns:repeat(28,1fr);gap:3px;"></div>
-                <div style="display:flex;gap:12px;margin-top:6px;font-size:11px;color:var(--text2);">
+                <div style="display:flex;gap:12px;margin-top:6px;font-size:12px;color:var(--text2);">
                     <span><span style="display:inline-block;width:10px;height:10px;background:var(--green);border-radius:2px;margin-right:3px;"></span>тренировка</span>
                     <span><span style="display:inline-block;width:10px;height:10px;background:var(--border);border-radius:2px;margin-right:3px;"></span>отдых</span>
                 </div>
@@ -585,7 +603,7 @@
         <div class="section">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
                 <h2 style="margin:0;">🏆 Мой прогресс</h2>
-                <button class="btn-primary btn-sm" onclick="const m=document.getElementById('progressSummaryLoaded');if(m)m.remove();loadProgressSummary()">🔍 Обновить</button>
+                <button class="btn-primary btn-sm" onclick="const m=document.getElementById('progressSummaryLoaded');if(m)m.remove();loadAiHistory()">🔍 Обновить</button>
             </div>
             <!-- Performance Badges -->
             <div id="badgesBlock" style="margin-bottom:20px;">
@@ -996,7 +1014,7 @@ async function loadWorkoutHistory() {
                     <div style="display:flex;align-items:center;gap:12px;">
                         <div style="text-align:right;">
                             <div style="font-weight:700;color:var(--green);font-size:14px;">${Math.round(w.total_tonnage)} кг</div>
-                            <div style="font-size:11px;color:var(--text2);">${w.duration_seconds ? '⏱ ' + Math.floor(w.duration_seconds/60) + ' мин' : 'тоннаж'}</div>
+                            <div style="font-size:12px;color:var(--text2);">${w.duration_seconds ? '⏱ ' + Math.floor(w.duration_seconds/60) + ' мин' : 'тоннаж'}</div>
                         </div>
                         <button onclick="deleteWorkoutByDate('${w.date}')" style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:#e31e24;" title="Удалить тренировку">🗑️</button>
                     </div>
@@ -1027,6 +1045,7 @@ function toggleHistory(idx) {
 }
 
 function showTab(name) {
+  if (tab === 'achievements') { loadAchievementsTab(); }
     document.getElementById('settingsMenu').classList.add('hidden');
     ['workout','history','progress','compare','stats','ai','myprogress'].forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
@@ -1074,6 +1093,7 @@ function startTimer(seconds, displayEl) {
         const remaining = Math.round((endTime - Date.now()) / 1000);
         if (remaining <= 0) {
             clearInterval(globalTimer.interval);
+            globalTimer = null;
             displayEl.textContent = '✓';
             displayEl.className = 'timer-display done';
             banner.className = 'visible done';
@@ -1817,14 +1837,14 @@ async function loadRecoveryHistory() {
             const card = document.createElement('div');
             card.style.cssText = 'background:var(--gl);border-radius:8px;padding:8px 10px;';
             card.innerHTML = `
-                <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">${r.log_date}</div>
+                <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">${r.log_date}</div>
                 <div style="font-size:16px;letter-spacing:2px;">${sleepEmoji}${energyEmoji}${stressEmoji}</div>
-                <div style="font-size:11px;color:var(--text2);margin-top:2px;">
+                <div style="font-size:12px;color:var(--text2);margin-top:2px;">
                     ${r.sleep ? 'Сон: ' + r.sleep : ''}
                     ${r.energy ? ' · Энергия: ' + r.energy : ''}
                     ${r.stress ? ' · Стресс: ' + r.stress : ''}
                 </div>
-                ${r.tonnage ? '<div style="font-size:11px;color:var(--green);font-weight:600;margin-top:2px;">Тоннаж: ' + Math.round(r.tonnage) + ' кг</div>' : ''}
+                ${r.tonnage ? '<div style="font-size:12px;color:var(--green);font-weight:600;margin-top:2px;">Тоннаж: ' + Math.round(r.tonnage) + ' кг</div>' : ''}
             `;
             grid.appendChild(card);
         });
@@ -2064,7 +2084,7 @@ async function loadMeasurements() {
             if (r.shoulder_cm) parts.push('Плечо: ' + r.shoulder_cm + ' см');
             if (r.bicep_cm) parts.push('Бицепс: ' + r.bicep_cm + ' см');
             return `<div style="background:var(--card);border-radius:8px;padding:10px 12px;">
-                <div style="font-size:11px;color:var(--text2);margin-bottom:4px;">📅 ${r.log_date}</div>
+                <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">📅 ${r.log_date}</div>
                 <div style="font-size:13px;color:var(--text);">${parts.join(' · ')} см</div>
             </div>`;
         }).join('');
@@ -2135,7 +2155,7 @@ async function loadAchievements() {
                 opacity:${earned ? '1' : '0.45'};
                 transition:all .2s;">
                 <div style="font-size:24px;margin-bottom:4px;">${b.icon}</div>
-                <div style="font-size:11px;font-weight:600;color:${earned ? 'var(--text)' : 'var(--text2)'};">${b.name}</div>
+                <div style="font-size:12px;font-weight:600;color:${earned ? 'var(--text)' : 'var(--text2)'};">${b.name}</div>
             </div>`;
         }).join('');
     } catch(e) {}
@@ -2289,7 +2309,7 @@ async function showAdmin() {
             <div>
                 <div style="font-weight:600;font-size:14px;color:var(--text)">${u.name || 'Без имени'} ${u.is_admin ? '👑' : ''}</div>
                 <div style="font-size:12px;color:var(--text2)">${u.email}</div>
-                <div style="font-size:11px;color:var(--text2)">тренировок: ${u.workout_count} · ${(u.created_at||'').slice(0,10)}</div>
+                <div style="font-size:12px;color:var(--text2)">тренировок: ${u.workout_count} · ${(u.created_at||'').slice(0,10)}</div>
             </div>
             ${adminButtons(u)}
         </div>
@@ -2341,6 +2361,120 @@ async function checkAdminAccess() {
         if (btn) btn.style.display = 'flex';
     }
 }
+
+// ── Достижения (tab-achievements) ──────────────────────────────────────────
+async function loadAchievementsTab() {
+  const grid = document.getElementById('achievements-grid');
+  const scoreBar = document.getElementById('achievements-score-bar');
+  if (!grid) return;
+  grid.innerHTML = '<p style="color:var(--muted);font-size:14px">Загрузка...</p>';
+  try {
+    const r = await fetch('/achievements');
+    const d = await r.json();
+    if (d.status !== 'ok') throw new Error(d.message || 'Ошибка');
+
+    scoreBar.innerHTML = `
+      <div style="background:var(--card-bg);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;border:1px solid var(--border)">
+        <div style="font-size:28px;font-weight:700;color:var(--accent)">${d.earned}</div>
+        <div>
+          <div style="font-size:13px;color:var(--muted)">получено из ${d.total}</div>
+          <div style="height:6px;background:var(--border);border-radius:4px;margin-top:6px;width:200px">
+            <div style="height:100%;width:${d.score}%;background:var(--accent);border-radius:4px;transition:width .4s"></div>
+          </div>
+        </div>
+        <div style="margin-left:auto;font-size:20px;font-weight:700;color:var(--accent)">${d.score}%</div>
+      </div>`;
+
+    grid.innerHTML = d.badges.map(b => `
+      <div style="background:var(--card-bg);border-radius:12px;padding:14px;text-align:center;
+           border:2px solid ${b.earned ? 'var(--accent)' : 'var(--border)'};
+           opacity:${b.earned ? '1' : '0.45'};transition:opacity .2s">
+        <div style="font-size:32px;margin-bottom:6px">${b.icon}</div>
+        <div style="font-weight:600;font-size:13px;margin-bottom:4px">${b.name}</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.3">${b.desc}</div>
+        ${b.earned && b.date ? `<div style="font-size:10px;color:var(--accent);margin-top:6px">${b.date}</div>` : ''}
+      </div>`).join('');
+  } catch(e) {
+    grid.innerHTML = `<p style="color:var(--error)">Ошибка: ${e.message}</p>`;
+  }
+
+  // Личные рекорды
+  const prsList = document.getElementById('prs-list');
+  if (prsList) {
+    try {
+      const r2 = await fetch('/prs');
+      const d2 = await r2.json();
+      if (d2.status === 'ok' && d2.prs && d2.prs.length) {
+        prsList.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' +
+          d2.prs.map(p => `
+            <div style="background:var(--card-bg);border-radius:10px;padding:12px 14px;
+                 border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:600;font-size:14px">${p.name}</div>
+                <div style="font-size:12px;color:var(--muted)">${p.date}</div>
+              </div>
+              <div style="font-size:18px;font-weight:700;color:var(--accent)">${p.weight} кг</div>
+            </div>`).join('') + '</div>';
+      } else {
+        prsList.innerHTML = '<p style="color:var(--muted);font-size:14px">Нет рекордов</p>';
+      }
+    } catch(e) {
+      prsList.innerHTML = '<p style="color:var(--muted);font-size:14px">Рекорды недоступны</p>';
+    }
+  }
+}
+
+// ── AI-анализ по кнопке ─────────────────────────────────────────────────────
+async function triggerAiAnalysis() {
+  const btn = document.getElementById('ai-trigger-btn');
+  const summaryEl = document.getElementById('progress-summary') ||
+                    document.getElementById('ai-summary') ||
+                    document.getElementById('summary-result') ||
+                    document.getElementById('progress-result') ||
+                    document.getElementById('ai-result');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Анализирую...'; }
+  try {
+    const r = await fetch('/ai-analyze', { method: 'POST' });
+    const d = await r.json();
+    if (d.status === 'ok') {
+      if (summaryEl) summaryEl.innerHTML = marked ? marked.parse(d.analysis || d.summary || '') : (d.analysis || d.summary || '');
+      await loadAiHistory();
+    } else {
+      showToast(d.message || 'Ошибка AI', true);
+    }
+  } catch(e) {
+    showToast('Ошибка соединения', true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 Запустить AI-анализ'; }
+  }
+}
+
+// ── История AI-анализов ─────────────────────────────────────────────────────
+async function loadAiHistory() {
+  const listEl = document.getElementById('ai-history-list');
+  if (!listEl) return;
+  try {
+    const r = await fetch('/ai-history');
+    const d = await r.json();
+    if (d.status !== 'ok' || !d.history.length) {
+      listEl.innerHTML = '<p style="color:var(--muted);font-size:14px">История анализов пуста</p>';
+      return;
+    }
+    listEl.innerHTML = d.history.map((h, i) => `
+      <details style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;overflow:hidden" ${i===0?'open':''}>
+        <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:14px;list-style:none;display:flex;justify-content:space-between">
+          <span>📊 ${h.date}</span>
+          <span style="font-size:12px;color:var(--muted);font-weight:400">${i===0?'последний':''}</span>
+        </summary>
+        <div style="padding:0 16px 14px;font-size:13px;line-height:1.6;color:var(--text)">
+          ${typeof marked !== 'undefined' ? marked.parse(h.text) : h.text.replace(/\n/g,'<br>')}
+        </div>
+      </details>`).join('');
+  } catch(e) {
+    listEl.innerHTML = '<p style="color:var(--muted);font-size:14px">Ошибка загрузки истории</p>';
+  }
+}
+// ── Хук на переключение вкладок ────────────────────────────────────────────
 </script>
 <div id="profileModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;">
     <div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:12px;">

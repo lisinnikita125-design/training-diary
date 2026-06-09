@@ -190,7 +190,19 @@ def init_db():
         )
     """)
 
-    conn.commit()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS ai_analysis_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            summary_text TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_hist_user ON ai_analysis_history(user_id, created_at)")
+
+        conn.commit()
     conn.close()
 
 
