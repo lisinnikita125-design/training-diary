@@ -375,13 +375,6 @@
 
     <!-- ═══ ПРОГРЕСС ═══ -->
     <div id="tab-progress" class="hidden">
-  <div style="margin-bottom:20px">
-    <button id="ai-trigger-btn" onclick="triggerAiAnalysis()"
-      style="width:100%;padding:14px;font-size:16px;font-weight:600;
-             background:var(--accent);color:#fff;border:none;border-radius:10px;cursor:pointer">
-      🤖 Запустить AI-анализ
-    </button>
-  </div>
         <div class="section">
             <div class="progress-controls">
                 <select id="exerciseSelect"></select>
@@ -605,14 +598,8 @@
                 <h2 style="margin:0;">🏆 Мой прогресс</h2>
                 <button class="btn-primary btn-sm" onclick="const m=document.getElementById('progressSummaryLoaded');if(m)m.remove();loadAiHistory()">🔍 Обновить</button>
             </div>
-            <!-- Performance Badges -->
-            <div id="badgesBlock" style="margin-bottom:20px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                    <span style="font-size:13px;font-weight:600;color:var(--text2);">Performance Badges</span>
-                    <span id="badgesScore" style="font-size:13px;font-weight:700;color:var(--green);"></span>
-                </div>
-                <div id="badgesList" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;"></div>
-            </div>
+
+            <div style="margin-bottom:16px"><button id="ai-trigger-btn" onclick="triggerAiAnalysis()" style="width:100%;padding:14px;font-size:16px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:10px;cursor:pointer">🤖 Запустить AI-анализ</button></div>
             <p style="font-size:13px;color:var(--text2);margin:0 0 16px 0;">AI-сводка прогресса за последние 8 недель на основе тренировок, веса тела и замеров.</p>
 
             <div id="progressLoading" class="hidden" style="text-align:center;padding:24px;color:var(--text2);">
@@ -2427,17 +2414,19 @@ async function loadAchievementsTab() {
 // ── AI-анализ по кнопке ─────────────────────────────────────────────────────
 async function triggerAiAnalysis() {
   const btn = document.getElementById('ai-trigger-btn');
-  const summaryEl = document.getElementById('progress-summary') ||
-                    document.getElementById('ai-summary') ||
-                    document.getElementById('summary-result') ||
-                    document.getElementById('progress-result') ||
-                    document.getElementById('ai-result');
+  const loading = document.getElementById('progressLoading');
+  const result  = document.getElementById('progressResult');
+  const textEl  = document.getElementById('progressResultText');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Анализирую...'; }
+  if (loading) loading.classList.remove('hidden');
+  if (result)  result.classList.add('hidden');
   try {
-    const r = await fetch('/ai-analyze', { method: 'POST' });
+    const r = await fetch('/ai-analyze', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({}) });
     const d = await r.json();
     if (d.status === 'ok') {
-      if (summaryEl) summaryEl.innerHTML = marked ? marked.parse(d.analysis || d.summary || '') : (d.analysis || d.summary || '');
+      const text = d.analysis || d.summary || '';
+      if (textEl) textEl.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text.replace(/\n/g,'<br>');
+      if (result) result.classList.remove('hidden');
       await loadAiHistory();
     } else {
       showToast(d.message || 'Ошибка AI', true);
@@ -2446,6 +2435,7 @@ async function triggerAiAnalysis() {
     showToast('Ошибка соединения', true);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🤖 Запустить AI-анализ'; }
+    if (loading) loading.classList.add('hidden');
   }
 }
 
