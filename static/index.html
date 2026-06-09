@@ -13,7 +13,7 @@
     <link rel="apple-touch-icon" href="/icon-192.png">
     <meta name="theme-color" content="#0f1117">
     
-<div id="tab-achievements" class="tab" style="display:none">
+<div id="tab-achievements" class="tab hidden">
   <h2 style="margin-bottom:16px">🏆 Достижения</h2>
   <div id="achievements-score-bar" style="margin-bottom:20px"></div>
   <div id="achievements-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px"></div>
@@ -1045,13 +1045,13 @@ function toggleHistory(idx) {
 }
 
 function showTab(name) {
-  if (tab === 'achievements') { loadAchievementsTab(); }
+  if (name === 'achievements') { loadAchievementsTab(); }
     document.getElementById('settingsMenu').classList.add('hidden');
-    ['workout','history','progress','compare','stats','ai','myprogress'].forEach(t => {
+    ['workout','history','progress','compare','stats','ai','myprogress','achievements'].forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
     });
     document.querySelectorAll('.nav-tab').forEach((btn, i) => {
-        btn.classList.toggle('active', ['workout','history','progress','compare','stats','ai','myprogress'][i] === name);
+        btn.classList.toggle('active', ['workout','history','achievements','progress','compare','stats','ai','myprogress'][i] === name);
     });
     if (name === 'stats') loadStats();
     if (name === 'compare') loadCompareDates();

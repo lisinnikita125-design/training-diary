@@ -1676,11 +1676,7 @@ def get_prs():
     uid = current_user_id()
     conn = get_db()
     rows = conn.execute("""
-        SELECT e.name, MAX(wl.weight) as weight,
-               (SELECT wl2.workout_date FROM workout_log wl2
-                WHERE wl2.user_id = wl.user_id AND wl2.exercise_id = wl.exercise_id
-                AND wl2.weight = MAX(wl.weight) AND wl2.set_number > 0
-                ORDER BY wl2.workout_date DESC LIMIT 1) as date
+        SELECT e.name, MAX(wl.weight) as weight, MAX(wl.workout_date) as date
         FROM workout_log wl
         JOIN exercises e ON e.id = wl.exercise_id
         WHERE wl.user_id = ? AND wl.set_number > 0 AND wl.weight > 0
