@@ -2542,7 +2542,10 @@ async function loadAiHistory() {
         </div>
 
         <h4 style="margin:8px 0 0;color:var(--text);font-size:15px;">➕ Новое упражнение</h4>
-        <select id="dmDaySelect" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;"></select>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <select id="dmDaySelect" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;"></select>
+            <button id="dmDeleteDayBtn" onclick="dmDeleteDay()" style="display:none;padding:10px 12px;background:none;border:1.5px solid #c62828;border-radius:8px;color:#c62828;cursor:pointer;font-size:15px;white-space:nowrap;">🗑</button>
+        </div>
         <input id="dmExName" placeholder="Название упражнения" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
         <input id="dmExMachine" placeholder="Модель/номер тренажёра (необязательно)" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
         <div style="display:flex;gap:8px;">
@@ -2564,6 +2567,7 @@ async function loadAiHistory() {
 
 <script>
 let dmAllUsers = [];
+let dmIsAdmin = false;
 
 async function showDayManager() {
     document.getElementById('settingsMenu').classList.add('hidden');
@@ -2572,6 +2576,7 @@ async function showDayManager() {
     try {
         const authResp = await fetch('/check-auth');
         const auth = await authResp.json();
+        dmIsAdmin = !!auth.is_admin;
         document.getElementById('dmAddDaySection').style.display = auth.is_admin ? 'block' : 'none';
         if (auth.is_admin) {
             const usersResp = await fetch('/admin/users');
@@ -2615,6 +2620,7 @@ async function dmRefreshDays() {
         });
     }
     if (sel.value) dmLoadExercises(sel.value);
+    document.getElementById('dmDeleteDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
 }
 
 async function dmLoadExercises(dayId) {
@@ -2624,7 +2630,10 @@ async function dmLoadExercises(dayId) {
         const resp = await fetch('/day/' + dayId);
         const data = await resp.json();
         list.innerHTML = (data.exercises || []).map(ex =>
-            `<div>• ${ex.name}${ex.plan_sets ? ' — ' + ex.plan_sets + '×' + (ex.plan_reps_range || '') : ''}</div>`
+            `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                <span>• ${ex.name}${ex.plan_sets ? ' — ' + ex.plan_sets + '×' + (ex.plan_reps_range || '') : ''}</span>
+                <button onclick="dmDeleteExercise(${ex.id})" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:16px;flex-shrink:0;">🗑</button>
+            </div>`
         ).join('') || '<div>Пока пусто</div>';
     } catch(e) {
         list.innerHTML = 'Ошибка загрузки';
@@ -2634,6 +2643,7 @@ async function dmLoadExercises(dayId) {
 document.addEventListener('change', (e) => {
     if (e.target && e.target.id === 'dmDaySelect') {
         dmLoadExercises(e.target.value);
+        document.getElementById('dmDeleteDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
     }
 });
 
@@ -2686,6 +2696,46 @@ async function dmAddExercise() {
     } catch(e) {
         msg.style.color = '#c62828';
         msg.textContent = 'Ошибка добавления';
+    }
+}
+
+async function dmDeleteExercise(exerciseId) {
+    if (!confirm('Удалить это упражнение?')) return;
+    const msg = document.getElementById('dmMsg');
+    try {
+        const resp = await fetch('/exercises/' + exerciseId, {method:'DELETE'});
+        if (!resp.ok) throw new Error();
+        msg.style.color = 'var(--green)';
+        msg.textContent = 'Упражнение удалено ✓';
+        const dayId = document.getElementById('dmDaySelect').value;
+        if (dayId) await dmLoadExercises(dayId);
+    } catch(e) {
+        msg.style.color = '#c62828';
+        msg.textContent = 'Не удалось удалить — возможно, по нему уже есть история тренировок';
+    }
+}
+
+async function dmDeleteDay() {
+    const dayId = document.getElementById('dmDaySelect').value;
+    if (!dayId) return;
+    const opt = document.getElementById('dmDaySelect').selectedOptions[0];
+    const dayName = opt ? opt.textContent : 'этот день';
+    if (!confirm('Удалить день "' + dayName + '"? Это необратимо.')) return;
+    const msg = document.getElementById('dmMsg');
+    try {
+        const resp = await fetch('/days/' + dayId, {method:'DELETE'});
+        if (!resp.ok) throw new Error();
+        msg.style.color = 'var(--green)';
+        msg.textContent = 'День удалён ✓';
+        const mainSel = document.getElementById('daySelect');
+        if (mainSel) {
+            const o = Array.from(mainSel.options).find(o => o.value === String(dayId));
+            if (o) o.remove();
+        }
+        await dmRefreshDays();
+    } catch(e) {
+        msg.style.color = '#c62828';
+        msg.textContent = 'Не удалось удалить — возможно, в дне ещё остались чьи-то упражнения';
     }
 }
 

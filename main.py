@@ -647,6 +647,52 @@ def add_exercise():
     return jsonify({"status": "ok", "id": ex_id})
 
 
+@app.route("/exercises/<int:exercise_id>", methods=["DELETE"])
+def delete_exercise(exercise_id):
+    require_auth()
+    uid = current_user_id()
+    conn = get_db()
+    cur = conn.cursor()
+    ex = cur.execute(
+        "SELECT id FROM exercises WHERE id=? AND user_id=?", (exercise_id, uid)
+    ).fetchone()
+    if not ex:
+        conn.close()
+        abort(404, description="Упражнение не найдено")
+    logged = cur.execute(
+        "SELECT COUNT(*) FROM workout_log WHERE exercise_id=?", (exercise_id,)
+    ).fetchone()[0]
+    if logged > 0:
+        conn.close()
+        abort(400, description="Нельзя удалить — есть история тренировок по этому упражнению")
+    cur.execute("DELETE FROM exercises WHERE id=?", (exercise_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/days/<int:day_id>", methods=["DELETE"])
+def delete_day(day_id):
+    require_admin()
+    conn = get_db()
+    cur = conn.cursor()
+    day = cur.execute("SELECT id FROM day_templates WHERE id=?", (day_id,)).fetchone()
+    if not day:
+        conn.close()
+        abort(404, description="День не найден")
+    remaining = cur.execute(
+        "SELECT COUNT(*) FROM exercises WHERE day_id=?", (day_id,)
+    ).fetchone()[0]
+    if remaining > 0:
+        conn.close()
+        abort(400, description="В этом дне ещё остались упражнения — сначала удалите их у всех пользователей")
+    cur.execute("DELETE FROM day_visibility WHERE day_id=?", (day_id,))
+    cur.execute("DELETE FROM day_templates WHERE id=?", (day_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+
 @app.route("/log", methods=["POST"])
 def log_workout():
     require_auth()
