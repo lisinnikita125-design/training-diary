@@ -202,7 +202,7 @@ def init_db():
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_ai_hist_user ON ai_analysis_history(user_id, created_at)")
 
-        conn.commit()
+    conn.commit()
     conn.close()
 
 
