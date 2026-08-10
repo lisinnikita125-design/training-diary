@@ -617,10 +617,12 @@ def add_exercise():
 
     conn = get_db()
     cur = conn.cursor()
-    day = cur.execute("SELECT id FROM day_templates WHERE id=?", (day_id,)).fetchone()
+    day = cur.execute("SELECT id, visibility FROM day_templates WHERE id=?", (day_id,)).fetchone()
     if not day:
         conn.close()
         abort(404, description="День не найден")
+
+    is_admin = bool(cur.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()["is_admin"])
 
     max_order = cur.execute(
         "SELECT COALESCE(MAX(sort_order), 0) FROM exercises WHERE day_id=? AND user_id=?",
@@ -629,8 +631,8 @@ def add_exercise():
 
     cur.execute("""
         INSERT INTO exercises
-        (day_id, name, machine_model, plan_sets, plan_reps_range, default_weight, rest_seconds, sort_order, user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (day_id, name, machine_model, plan_sets, plan_reps_range, default_weight, rest_seconds, sort_order, user_id, origin_exercise_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
     """, (
         day_id, name,
         data.get("machine_model"),
@@ -642,6 +644,38 @@ def add_exercise():
         uid
     ))
     ex_id = cur.lastrowid
+
+    # Автокопирование упражнения тем, кому доступен день (только если добавляет админ)
+    if is_admin and day["visibility"] in ("all", "custom"):
+        if day["visibility"] == "all":
+            target_ids = [r[0] for r in cur.execute(
+                "SELECT id FROM users WHERE id != ?", (uid,)
+            ).fetchall()]
+        else:
+            target_ids = [r[0] for r in cur.execute(
+                "SELECT user_id FROM day_visibility WHERE day_id=? AND user_id != ?", (day_id, uid)
+            ).fetchall()]
+        for target_uid in target_ids:
+            t_max_order = cur.execute(
+                "SELECT COALESCE(MAX(sort_order), 0) FROM exercises WHERE day_id=? AND user_id=?",
+                (day_id, target_uid)
+            ).fetchone()[0]
+            cur.execute("""
+                INSERT INTO exercises
+                (day_id, name, machine_model, plan_sets, plan_reps_range, default_weight, rest_seconds, sort_order, user_id, origin_exercise_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                day_id, name,
+                data.get("machine_model"),
+                data.get("plan_sets"),
+                data.get("plan_reps_range"),
+                data.get("default_weight"),
+                data.get("rest_seconds"),
+                t_max_order + 1,
+                target_uid,
+                ex_id
+            ))
+
     conn.commit()
     conn.close()
     return jsonify({"status": "ok", "id": ex_id})
@@ -665,6 +699,8 @@ def delete_exercise(exercise_id):
     if logged > 0:
         conn.close()
         abort(400, description="Нельзя удалить — есть история тренировок по этому упражнению")
+    # Копии у других пользователей не удаляем — просто отвязываем от исходника
+    cur.execute("UPDATE exercises SET origin_exercise_id = NULL WHERE origin_exercise_id = ?", (exercise_id,))
     cur.execute("DELETE FROM exercises WHERE id=?", (exercise_id,))
     conn.commit()
     conn.close()
@@ -1002,6 +1038,16 @@ def update_exercise(exercise_id):
     params.append(exercise_id)
     params.append(uid)
     cur.execute(f"UPDATE exercises SET {', '.join(updates)} WHERE id = ? AND user_id = ?", params)
+
+    # Пробрасываем изменения в копии у других пользователей (только для админа)
+    is_admin = bool(cur.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()["is_admin"])
+    if is_admin:
+        propagate_fields = [f for f in allowed if f != "sort_order" and f in data and data[f] is not None]
+        if propagate_fields:
+            set_clause = ", ".join(f"{f} = ?" for f in propagate_fields)
+            propagate_params = [data[f] for f in propagate_fields] + [exercise_id]
+            cur.execute(f"UPDATE exercises SET {set_clause} WHERE origin_exercise_id = ?", propagate_params)
+
     conn.commit()
     conn.close()
     return jsonify({"status": "ok", "exercise_id": exercise_id})

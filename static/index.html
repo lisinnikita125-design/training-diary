@@ -2545,6 +2545,7 @@ async function loadAiHistory() {
         </div>
 
         <h4 style="margin:8px 0 0;color:var(--text);font-size:15px;">➕ Новое упражнение</h4>
+        <div id="dmPropagateHint" style="display:none;font-size:13px;color:var(--text2);">✨ Появится у всех, кому виден этот день</div>
         <div style="display:flex;gap:8px;align-items:center;">
             <select id="dmDaySelect" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;"></select>
             <button id="dmEditDayBtn" onclick="dmEditDay()" style="display:none;padding:10px 12px;background:none;border:1.5px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:15px;white-space:nowrap;">✏️</button>
@@ -2636,6 +2637,17 @@ let dmCurrentExercises = [];
 async function dmLoadExercises(dayId) {
     const list = document.getElementById('dmExercisesList');
     list.innerHTML = 'Загрузка...';
+    const hint = document.getElementById('dmPropagateHint');
+    hint.style.display = 'none';
+    if (dmIsAdmin) {
+        try {
+            const detailsResp = await fetch('/days/' + dayId + '/details');
+            if (detailsResp.ok) {
+                const d = await detailsResp.json();
+                hint.style.display = (d.visibility === 'all' || d.visibility === 'custom') ? 'block' : 'none';
+            }
+        } catch(e) {}
+    }
     try {
         const resp = await fetch('/day/' + dayId);
         const data = await resp.json();
