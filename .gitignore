@@ -42,3 +42,5 @@ static.zip
 *.bak_*
 backups/
 config.py
+logs/
+patch_*.py

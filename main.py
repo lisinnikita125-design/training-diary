@@ -521,18 +521,31 @@ def get_day(day_id):
     uid = current_user_id()
     conn = get_db()
     cur = conn.cursor()
-    # Дни — глобальные шаблоны, без фильтра по user
-    day = cur.execute("SELECT id, name FROM day_templates WHERE id = ?", (day_id,)).fetchone()
+    day = cur.execute(
+        "SELECT id, name, visibility, owner_user_id FROM day_templates WHERE id = ?",
+        (day_id,)
+    ).fetchone()
     if not day:
         conn.close()
         abort(404, description="День не найден")
-    # Упражнения — только личные копии пользователя
+
+    allowed = (
+        day["visibility"] == "all"
+        or day["owner_user_id"] == uid
+        or cur.execute(
+            "SELECT 1 FROM day_visibility WHERE day_id=? AND user_id=?", (day_id, uid)
+        ).fetchone() is not None
+    )
+    if not allowed:
+        conn.close()
+        abort(404, description="День не найден")
+
     exercises = cur.execute("""
         SELECT id, name, machine_model, plan_sets, plan_reps_range, default_weight, rest_seconds
         FROM exercises WHERE day_id = ? AND user_id = ? ORDER BY sort_order
     """, (day_id, uid)).fetchall()
     conn.close()
-    return jsonify({"day": dict(day), "exercises": [dict(ex) for ex in exercises]})
+    return jsonify({"day": {"id": day["id"], "name": day["name"]}, "exercises": [dict(ex) for ex in exercises]})
 
 
 # ══════════════════════════════════════════════
@@ -541,10 +554,17 @@ def get_day(day_id):
 @app.route("/days", methods=["GET"])
 def get_days():
     require_auth()
+    uid = current_user_id()
     conn = get_db()
-    days = conn.execute(
-        "SELECT id, name, sort_order FROM day_templates ORDER BY sort_order"
-    ).fetchall()
+    days = conn.execute("""
+        SELECT DISTINCT d.id, d.name, d.sort_order
+        FROM day_templates d
+        LEFT JOIN day_visibility dv ON dv.day_id = d.id AND dv.user_id = ?
+        WHERE d.visibility = 'all'
+           OR d.owner_user_id = ?
+           OR dv.user_id IS NOT NULL
+        ORDER BY d.sort_order
+    """, (uid, uid)).fetchall()
     conn.close()
     return jsonify([dict(d) for d in days])
 
@@ -552,23 +572,37 @@ def get_days():
 @app.route("/days", methods=["POST"])
 def add_day():
     require_admin()
+    uid = current_user_id()
     data = request.get_json() or {}
     name = (data.get("name") or "").strip()
+    visibility = data.get("visibility") or "all"
+    if visibility not in ("all", "private", "custom"):
+        abort(400, description="Некорректная видимость")
     if not name:
         abort(400, description="Название дня обязательно")
+    user_ids = data.get("user_ids") or []
+
     conn = get_db()
     cur = conn.cursor()
     max_order = cur.execute(
         "SELECT COALESCE(MAX(sort_order), 0) FROM day_templates"
     ).fetchone()[0]
     cur.execute(
-        "INSERT INTO day_templates (name, sort_order) VALUES (?, ?)",
-        (name, max_order + 1)
+        "INSERT INTO day_templates (name, sort_order, visibility, owner_user_id) VALUES (?, ?, ?, ?)",
+        (name, max_order + 1, visibility, uid)
     )
     day_id = cur.lastrowid
+
+    if visibility == "custom":
+        for u in user_ids:
+            cur.execute(
+                "INSERT OR IGNORE INTO day_visibility (day_id, user_id) VALUES (?, ?)",
+                (day_id, int(u))
+            )
+
     conn.commit()
     conn.close()
-    return jsonify({"status": "ok", "id": day_id, "name": name, "sort_order": max_order + 1})
+    return jsonify({"status": "ok", "id": day_id, "name": name, "sort_order": max_order + 1, "visibility": visibility})
 
 
 @app.route("/exercises", methods=["POST"])

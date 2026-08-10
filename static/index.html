@@ -2531,10 +2531,14 @@ async function loadAiHistory() {
 
         <div id="dmAddDaySection" style="display:none;border-bottom:1px solid var(--border);padding-bottom:12px;">
             <h4 style="margin:0 0 8px;color:var(--text);font-size:15px;">➕ Новый день</h4>
-            <div style="display:flex;gap:8px;">
-                <input id="dmNewDayName" placeholder="Например: День 4 – РУКИ" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
-                <button class="btn-primary" onclick="dmAddDay()">Создать</button>
-            </div>
+            <input id="dmNewDayName" placeholder="Например: День 4 – РУКИ" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;margin-bottom:8px;box-sizing:border-box;">
+            <select id="dmDayVisibility" onchange="dmToggleVisibilityUsers()" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;margin-bottom:8px;box-sizing:border-box;">
+                <option value="all">🌍 Видно всем</option>
+                <option value="private">🔒 Только мне</option>
+                <option value="custom">👥 Выбрать людей</option>
+            </select>
+            <div id="dmVisibilityUsers" style="display:none;flex-direction:column;gap:4px;margin-bottom:8px;max-height:140px;overflow-y:auto;padding:8px;border:1.5px solid var(--border);border-radius:8px;"></div>
+            <button class="btn-primary" onclick="dmAddDay()" style="width:100%;">Создать день</button>
         </div>
 
         <h4 style="margin:8px 0 0;color:var(--text);font-size:15px;">➕ Новое упражнение</h4>
@@ -2559,6 +2563,8 @@ async function loadAiHistory() {
 </div>
 
 <script>
+let dmAllUsers = [];
+
 async function showDayManager() {
     document.getElementById('settingsMenu').classList.add('hidden');
     document.getElementById('dmMsg').textContent = '';
@@ -2567,8 +2573,25 @@ async function showDayManager() {
         const authResp = await fetch('/check-auth');
         const auth = await authResp.json();
         document.getElementById('dmAddDaySection').style.display = auth.is_admin ? 'block' : 'none';
+        if (auth.is_admin) {
+            const usersResp = await fetch('/admin/users');
+            if (usersResp.ok) dmAllUsers = await usersResp.json();
+        }
     } catch(e) {}
     await dmRefreshDays();
+}
+
+function dmToggleVisibilityUsers() {
+    const vis = document.getElementById('dmDayVisibility').value;
+    const box = document.getElementById('dmVisibilityUsers');
+    if (vis !== 'custom') { box.style.display = 'none'; return; }
+    box.style.display = 'flex';
+    box.innerHTML = dmAllUsers.map(u =>
+        `<label style="display:flex;align-items:center;gap:6px;font-size:14px;color:var(--text);cursor:pointer;">
+            <input type="checkbox" value="${u.id}" class="dm-user-check">
+            ${u.name || u.email}
+        </label>`
+    ).join('') || '<span style="font-size:13px;color:var(--text2)">Нет других пользователей</span>';
 }
 
 async function dmRefreshDays() {
@@ -2617,11 +2640,19 @@ document.addEventListener('change', (e) => {
 async function dmAddDay() {
     const msg = document.getElementById('dmMsg');
     const name = document.getElementById('dmNewDayName').value.trim();
+    const visibility = document.getElementById('dmDayVisibility').value;
     if (!name) { msg.style.color = '#c62828'; msg.textContent = 'Введите название дня'; return; }
+    let user_ids = [];
+    if (visibility === 'custom') {
+        user_ids = Array.from(document.querySelectorAll('.dm-user-check:checked')).map(el => parseInt(el.value));
+        if (user_ids.length === 0) { msg.style.color = '#c62828'; msg.textContent = 'Выберите хотя бы одного человека'; return; }
+    }
     try {
-        const resp = await fetch('/days', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+        const resp = await fetch('/days', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, visibility, user_ids})});
         if (!resp.ok) throw new Error();
         document.getElementById('dmNewDayName').value = '';
+        document.getElementById('dmDayVisibility').value = 'all';
+        dmToggleVisibilityUsers();
         msg.style.color = 'var(--green)';
         msg.textContent = 'День создан ✓';
         await dmRefreshDays();
