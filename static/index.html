@@ -2538,12 +2538,16 @@ async function loadAiHistory() {
                 <option value="custom">👥 Выбрать людей</option>
             </select>
             <div id="dmVisibilityUsers" style="display:none;flex-direction:column;gap:4px;margin-bottom:8px;max-height:140px;overflow-y:auto;padding:8px;border:1.5px solid var(--border);border-radius:8px;"></div>
-            <button class="btn-primary" onclick="dmAddDay()" style="width:100%;">Создать день</button>
+            <div style="display:flex;gap:8px;">
+                <button id="dmDaySaveBtn" class="btn-primary" onclick="dmAddDay()" style="flex:1;">Создать день</button>
+                <button id="dmDayCancelBtn" onclick="dmCancelDayEdit()" style="display:none;padding:10px 16px;background:none;border:1.5px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:15px;">Отмена</button>
+            </div>
         </div>
 
         <h4 style="margin:8px 0 0;color:var(--text);font-size:15px;">➕ Новое упражнение</h4>
         <div style="display:flex;gap:8px;align-items:center;">
             <select id="dmDaySelect" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;"></select>
+            <button id="dmEditDayBtn" onclick="dmEditDay()" style="display:none;padding:10px 12px;background:none;border:1.5px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:15px;white-space:nowrap;">✏️</button>
             <button id="dmDeleteDayBtn" onclick="dmDeleteDay()" style="display:none;padding:10px 12px;background:none;border:1.5px solid #c62828;border-radius:8px;color:#c62828;cursor:pointer;font-size:15px;white-space:nowrap;">🗑</button>
         </div>
         <input id="dmExName" placeholder="Название упражнения" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
@@ -2554,7 +2558,10 @@ async function loadAiHistory() {
             <input id="dmExWeight" type="number" step="0.5" placeholder="Вес" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;width:33%;">
         </div>
         <input id="dmExRest" type="number" placeholder="Отдых, сек (необязательно)" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
-        <button class="btn-primary" onclick="dmAddExercise()">💾 Добавить упражнение</button>
+        <div style="display:flex;gap:8px;">
+            <button id="dmExSaveBtn" class="btn-primary" onclick="dmAddExercise()" style="flex:1;">💾 Добавить упражнение</button>
+            <button id="dmExCancelBtn" onclick="dmCancelExerciseEdit()" style="display:none;padding:10px 16px;background:none;border:1.5px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:15px;">Отмена</button>
+        </div>
         <span id="dmMsg" style="font-size:14px;text-align:center;min-height:16px;"></span>
 
         <hr style="border:none;border-top:1px solid var(--border);margin:4px 0;">
@@ -2621,7 +2628,10 @@ async function dmRefreshDays() {
     }
     if (sel.value) dmLoadExercises(sel.value);
     document.getElementById('dmDeleteDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
+    document.getElementById('dmEditDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
 }
+
+let dmCurrentExercises = [];
 
 async function dmLoadExercises(dayId) {
     const list = document.getElementById('dmExercisesList');
@@ -2629,10 +2639,14 @@ async function dmLoadExercises(dayId) {
     try {
         const resp = await fetch('/day/' + dayId);
         const data = await resp.json();
-        list.innerHTML = (data.exercises || []).map(ex =>
+        dmCurrentExercises = data.exercises || [];
+        list.innerHTML = dmCurrentExercises.map(ex =>
             `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
                 <span>• ${ex.name}${ex.plan_sets ? ' — ' + ex.plan_sets + '×' + (ex.plan_reps_range || '') : ''}</span>
-                <button onclick="dmDeleteExercise(${ex.id})" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:16px;flex-shrink:0;">🗑</button>
+                <span style="display:flex;gap:6px;flex-shrink:0;">
+                    <button onclick="dmEditExercise(${ex.id})" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;">✏️</button>
+                    <button onclick="dmDeleteExercise(${ex.id})" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:16px;">🗑</button>
+                </span>
             </div>`
         ).join('') || '<div>Пока пусто</div>';
     } catch(e) {
@@ -2644,8 +2658,12 @@ document.addEventListener('change', (e) => {
     if (e.target && e.target.id === 'dmDaySelect') {
         dmLoadExercises(e.target.value);
         document.getElementById('dmDeleteDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
+        document.getElementById('dmEditDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
+        dmCancelExerciseEdit();
     }
 });
+
+let dmEditingDayId = null;
 
 async function dmAddDay() {
     const msg = document.getElementById('dmMsg');
@@ -2657,26 +2675,68 @@ async function dmAddDay() {
         user_ids = Array.from(document.querySelectorAll('.dm-user-check:checked')).map(el => parseInt(el.value));
         if (user_ids.length === 0) { msg.style.color = '#c62828'; msg.textContent = 'Выберите хотя бы одного человека'; return; }
     }
+    const editingId = dmEditingDayId;
     try {
-        const resp = await fetch('/days', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, visibility, user_ids})});
+        const resp = editingId
+            ? await fetch('/days/' + editingId, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, visibility, user_ids})})
+            : await fetch('/days', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, visibility, user_ids})});
         if (!resp.ok) throw new Error();
-        document.getElementById('dmNewDayName').value = '';
-        document.getElementById('dmDayVisibility').value = 'all';
-        dmToggleVisibilityUsers();
+        dmCancelDayEdit();
         msg.style.color = 'var(--green)';
-        msg.textContent = 'День создан ✓';
+        msg.textContent = editingId ? 'День обновлён ✓' : 'День создан ✓';
         await dmRefreshDays();
     } catch(e) {
         msg.style.color = '#c62828';
-        msg.textContent = 'Ошибка создания дня';
+        msg.textContent = 'Ошибка сохранения дня';
     }
 }
+
+async function dmEditDay() {
+    const dayId = document.getElementById('dmDaySelect').value;
+    if (!dayId) return;
+    const msg = document.getElementById('dmMsg');
+    try {
+        const resp = await fetch('/days/' + dayId + '/details');
+        if (!resp.ok) throw new Error();
+        const d = await resp.json();
+        dmEditingDayId = d.id;
+        document.getElementById('dmNewDayName').value = d.name;
+        document.getElementById('dmDayVisibility').value = d.visibility;
+        dmToggleVisibilityUsers();
+        if (d.visibility === 'custom') {
+            setTimeout(() => {
+                (d.user_ids || []).forEach(uid => {
+                    const cb = document.querySelector('.dm-user-check[value="' + uid + '"]');
+                    if (cb) cb.checked = true;
+                });
+            }, 0);
+        }
+        document.getElementById('dmDaySaveBtn').textContent = '💾 Сохранить изменения';
+        document.getElementById('dmDayCancelBtn').style.display = 'inline-block';
+        msg.textContent = '';
+    } catch(e) {
+        msg.style.color = '#c62828';
+        msg.textContent = 'Не удалось загрузить данные дня';
+    }
+}
+
+function dmCancelDayEdit() {
+    dmEditingDayId = null;
+    document.getElementById('dmNewDayName').value = '';
+    document.getElementById('dmDayVisibility').value = 'all';
+    dmToggleVisibilityUsers();
+    document.getElementById('dmDaySaveBtn').textContent = 'Создать день';
+    document.getElementById('dmDayCancelBtn').style.display = 'none';
+}
+
+let dmEditingExerciseId = null;
 
 async function dmAddExercise() {
     const msg = document.getElementById('dmMsg');
     const dayId = document.getElementById('dmDaySelect').value;
     const name = document.getElementById('dmExName').value.trim();
     if (!dayId || !name) { msg.style.color = '#c62828'; msg.textContent = 'Выберите день и введите название'; return; }
+    const editingId = dmEditingExerciseId;
     const payload = {
         day_id: parseInt(dayId),
         name,
@@ -2687,16 +2747,40 @@ async function dmAddExercise() {
         rest_seconds: document.getElementById('dmExRest').value ? parseInt(document.getElementById('dmExRest').value) : null
     };
     try {
-        const resp = await fetch('/exercises', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+        const resp = editingId
+            ? await fetch('/exercise/' + editingId, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+            : await fetch('/exercises', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
         if (!resp.ok) throw new Error();
-        ['dmExName','dmExMachine','dmExSets','dmExReps','dmExWeight','dmExRest'].forEach(id => document.getElementById(id).value = '');
+        dmCancelExerciseEdit();
         msg.style.color = 'var(--green)';
-        msg.textContent = 'Упражнение добавлено ✓';
+        msg.textContent = editingId ? 'Изменения сохранены ✓' : 'Упражнение добавлено ✓';
         await dmLoadExercises(dayId);
     } catch(e) {
         msg.style.color = '#c62828';
-        msg.textContent = 'Ошибка добавления';
+        msg.textContent = 'Ошибка сохранения';
     }
+}
+
+function dmEditExercise(id) {
+    const ex = dmCurrentExercises.find(e => e.id === id);
+    if (!ex) return;
+    dmEditingExerciseId = id;
+    document.getElementById('dmExName').value = ex.name || '';
+    document.getElementById('dmExMachine').value = ex.machine_model || '';
+    document.getElementById('dmExSets').value = ex.plan_sets || '';
+    document.getElementById('dmExReps').value = ex.plan_reps_range || '';
+    document.getElementById('dmExWeight').value = ex.default_weight || '';
+    document.getElementById('dmExRest').value = ex.rest_seconds || '';
+    document.getElementById('dmExSaveBtn').textContent = '💾 Сохранить изменения';
+    document.getElementById('dmExCancelBtn').style.display = 'inline-block';
+    document.getElementById('dmMsg').textContent = '';
+}
+
+function dmCancelExerciseEdit() {
+    dmEditingExerciseId = null;
+    ['dmExName','dmExMachine','dmExSets','dmExReps','dmExWeight','dmExRest'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('dmExSaveBtn').textContent = '💾 Добавить упражнение';
+    document.getElementById('dmExCancelBtn').style.display = 'none';
 }
 
 async function dmDeleteExercise(exerciseId) {

@@ -693,6 +693,59 @@ def delete_day(day_id):
     return jsonify({"status": "ok"})
 
 
+@app.route("/days/<int:day_id>", methods=["PATCH"])
+def update_day(day_id):
+    require_admin()
+    data = request.get_json() or {}
+    name = (data.get("name") or "").strip()
+    visibility = data.get("visibility") or "all"
+    if visibility not in ("all", "private", "custom"):
+        abort(400, description="Некорректная видимость")
+    if not name:
+        abort(400, description="Название дня обязательно")
+    user_ids = data.get("user_ids") or []
+
+    conn = get_db()
+    cur = conn.cursor()
+    day = cur.execute("SELECT id FROM day_templates WHERE id=?", (day_id,)).fetchone()
+    if not day:
+        conn.close()
+        abort(404, description="День не найден")
+
+    cur.execute(
+        "UPDATE day_templates SET name=?, visibility=? WHERE id=?",
+        (name, visibility, day_id)
+    )
+    cur.execute("DELETE FROM day_visibility WHERE day_id=?", (day_id,))
+    if visibility == "custom":
+        for u in user_ids:
+            cur.execute(
+                "INSERT OR IGNORE INTO day_visibility (day_id, user_id) VALUES (?, ?)",
+                (day_id, int(u))
+            )
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok"})
+
+
+@app.route("/days/<int:day_id>/details", methods=["GET"])
+def day_details(day_id):
+    require_admin()
+    conn = get_db()
+    cur = conn.cursor()
+    day = cur.execute(
+        "SELECT id, name, visibility FROM day_templates WHERE id=?", (day_id,)
+    ).fetchone()
+    if not day:
+        conn.close()
+        abort(404, description="День не найден")
+    user_ids = [r[0] for r in cur.execute(
+        "SELECT user_id FROM day_visibility WHERE day_id=?", (day_id,)
+    ).fetchall()]
+    conn.close()
+    return jsonify({"id": day["id"], "name": day["name"], "visibility": day["visibility"], "user_ids": user_ids})
+
+
 @app.route("/log", methods=["POST"])
 def log_workout():
     require_auth()
