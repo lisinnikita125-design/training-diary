@@ -2575,7 +2575,7 @@ async function showDayManager() {
         document.getElementById('dmAddDaySection').style.display = auth.is_admin ? 'block' : 'none';
         if (auth.is_admin) {
             const usersResp = await fetch('/admin/users');
-            if (usersResp.ok) dmAllUsers = await usersResp.json();
+            if (usersResp.ok) { const d = await usersResp.json(); dmAllUsers = d.users || d; }
         }
     } catch(e) {}
     await dmRefreshDays();
