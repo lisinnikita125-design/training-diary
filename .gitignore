@@ -36,3 +36,9 @@ static.zip
 *.zip
 
 .git-credentials
+*.db
+*.db-journal
+.lesshst
+*.bak_*
+backups/
+config.py
