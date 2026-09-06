@@ -352,12 +352,12 @@ def backup_db():
 # ══════════════════════════════════════════════
 def require_admin():
     if not session.get("auth"):
-        abort(401)
+        abort(401, description="Не авторизован")
     conn = get_db()
     user = conn.execute("SELECT is_admin FROM users WHERE id=?", (current_user_id(),)).fetchone()
     conn.close()
     if not user or not user["is_admin"]:
-        abort(403)
+        abort(403, description="Недостаточно прав")
 
 @app.route("/admin/users")
 def admin_users():
@@ -1916,6 +1916,14 @@ def workout_history():
 
     conn.close()
     return jsonify({"history": result})
+
+@app.errorhandler(401)
+def handle_401(e):
+    return jsonify({"status": "error", "message": e.description or "Не авторизован"}), 401
+
+@app.errorhandler(403)
+def handle_403(e):
+    return jsonify({"status": "error", "message": e.description or "Доступ запрещён"}), 403
 
 @app.errorhandler(500)
 def handle_500(e):
