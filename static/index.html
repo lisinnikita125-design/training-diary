@@ -19,6 +19,7 @@
     <title>Progressor</title>
     <style>
         * { box-sizing: border-box; }
+        html { overscroll-behavior: none; }
         :root {
             --bg:#14161B; --card:#1E2128; --text:#EDEEF2; --text2:#868C99;
             --green:#3C6E9E; --gl:#16232E; --gm:#1E3346; --border:#2A2E38;
@@ -840,6 +841,25 @@ document.addEventListener('visibilitychange', async () => {
     }, {passive: true});
 })();
 
+// ══════════════════════════════════════════════
+//  БЛОКИРОВКА PULL-TO-REFRESH ПРИ ЛОГИРОВАНИИ
+// ══════════════════════════════════════════════
+// overscroll-behavior:none на html/body обычно достаточно, но подстраховка
+// для iOS Safari (в т.ч. PWA с главного экрана) — гасим сам жест.
+(function() {
+    let startY = 0;
+    document.addEventListener('touchstart', e => {
+        startY = e.touches[0].clientY;
+    }, {passive: true});
+    document.addEventListener('touchmove', e => {
+        const section = document.getElementById('exercisesSection');
+        if (!section || section.classList.contains('hidden')) return;
+        const scrollY = window.scrollY || document.documentElement.scrollTop;
+        const dy = e.touches[0].clientY - startY;
+        if (scrollY <= 0 && dy > 0) e.preventDefault();
+    }, {passive: false});
+})();
+
 // Пересчёт таймера после разблокировки экрана
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && globalTimer) {
@@ -877,8 +897,23 @@ window.onload = async () => {
         // Проверяем напоминание при входе
         const rem = await fetch('/check-reminder').then(r=>r.json()).catch(()=>({}));
         if (rem.days_since >= 3) maybeNotify(rem.days_since);
+        await restoreActiveWorkoutOnLoad();
     }
 };
+
+async function restoreActiveWorkoutOnLoad() {
+    const state = restoreTableState();
+    if (!state || !state.rows || state.rows.length === 0) return;
+    const sel = document.getElementById('daySelect');
+    if (!sel.querySelector(`option[value="${state.dayId}"]`)) {
+        const opt = document.createElement('option');
+        opt.value = state.dayId;
+        opt.textContent = 'День ' + state.dayId;
+        sel.appendChild(opt);
+    }
+    sel.value = String(state.dayId);
+    await loadDayWithRestore(true);
+}
 
 // ══════════════════════════════════════════════
 //  СВОДКА ДНЯ
@@ -1281,14 +1316,14 @@ async function loadDay() {
     updateTotalTonnage();
 }
 
-async function loadDayWithRestore() {
+async function loadDayWithRestore(silent = false) {
     // Проверяем есть ли сохранённое состояние
     const state = restoreTableState();
     const dayId = document.getElementById('daySelect').value;
 
     if (state && state.dayId === dayId && state.rows.length > 0) {
         const mins = Math.round((Date.now() - state.savedAt) / 60000);
-        if (confirm(`Найдены несохранённые данные (${mins} мин назад). Восстановить?`)) {
+        if (silent || confirm(`Найдены несохранённые данные (${mins} мин назад). Восстановить?`)) {
             await loadDay();
             // Восстанавливаем значения
             setTimeout(() => {
