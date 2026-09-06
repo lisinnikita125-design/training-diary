@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, abort, session, Response
 from database import get_db, init_db, seed_user
-import os, shutil, csv, io, secrets
+import os, shutil, csv, io, secrets, json, html
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -10,21 +10,26 @@ import os
 # ── Читаем секреты из файла config.py ───────────────────
 try:
     import config as _cfg
-    app.secret_key = _cfg.SECRET_KEY
-    MAIL_SERVER   = getattr(_cfg, "MAIL_SERVER",   "smtp.gmail.com")
-    MAIL_PORT     = getattr(_cfg, "MAIL_PORT",     587)
-    MAIL_USER     = getattr(_cfg, "MAIL_USER",     "")
-    MAIL_PASSWORD = getattr(_cfg, "MAIL_PASSWORD", "")
-    MAIL_FROM     = getattr(_cfg, "MAIL_FROM",     MAIL_USER)
-    APP_URL       = getattr(_cfg, "APP_URL",       "https://nikitalisin.pythonanywhere.com")
-except Exception:
-    app.secret_key = "change-this-fallback"
-    MAIL_SERVER = "smtp.gmail.com"
-    MAIL_PORT = 587
-    MAIL_USER = ""
-    MAIL_PASSWORD = ""
-    MAIL_FROM = ""
-    APP_URL = "https://nikitalisin.pythonanywhere.com"
+except ImportError as e:
+    raise RuntimeError(
+        "Не найден config.py. Создайте файл config.py в корне проекта "
+        "с обязательной переменной SECRET_KEY (случайная строка, "
+        "например secrets.token_hex(32)) перед запуском приложения."
+    ) from e
+
+if not getattr(_cfg, "SECRET_KEY", None):
+    raise RuntimeError(
+        "В config.py отсутствует SECRET_KEY. Задайте случайный секрет "
+        "(например secrets.token_hex(32)) перед запуском приложения."
+    )
+
+app.secret_key = _cfg.SECRET_KEY
+MAIL_SERVER   = getattr(_cfg, "MAIL_SERVER",   "smtp.gmail.com")
+MAIL_PORT     = getattr(_cfg, "MAIL_PORT",     587)
+MAIL_USER     = getattr(_cfg, "MAIL_USER",     "")
+MAIL_PASSWORD = getattr(_cfg, "MAIL_PASSWORD", "")
+MAIL_FROM     = getattr(_cfg, "MAIL_FROM",     MAIL_USER)
+APP_URL       = getattr(_cfg, "APP_URL",       "https://nikitalisin.pythonanywhere.com")
 
 init_db()
 
@@ -147,6 +152,7 @@ def register():
     seed_user(user_id)
 
     verify_url = f"{APP_URL}/verify-email?token={token}"
+    safe_name = html.escape(name)
     send_email(email, "Подтверди email — Progressor", f"""
     <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;background:#0f1117;border-radius:16px;overflow:hidden;">
         <div style="background:linear-gradient(135deg,#1a3d28,#2ecc71);padding:32px;text-align:center;">
@@ -155,7 +161,7 @@ def register():
             <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:13px;">Train smarter. Recover better.</p>
         </div>
         <div style="padding:32px;background:#1a1d26;">
-            <h2 style="color:#e8eaf0;margin:0 0 16px;font-size:20px;">Привет{', ' + name if name else ''}! 👋</h2>
+            <h2 style="color:#e8eaf0;margin:0 0 16px;font-size:20px;">Привет{', ' + safe_name if safe_name else ''}! 👋</h2>
             <p style="color:#8b92a8;line-height:1.6;margin:0 0 24px;">Ты почти готов начать тренироваться умнее. Подтверди свой email чтобы войти в Progressor.</p>
             <a href="{verify_url}" style="display:block;background:linear-gradient(135deg,#1a8a4a,#2ecc71);color:white;text-decoration:none;padding:14px 24px;border-radius:10px;font-weight:700;font-size:16px;text-align:center;">✅ Подтвердить email</a>
             <p style="color:#8b92a8;font-size:12px;margin:24px 0 0;text-align:center;">Если ты не регистрировался — просто проигнорируй это письмо.</p>
@@ -257,6 +263,12 @@ def forgot_password():
 def reset_password():
     if request.method == "GET":
         token = request.args.get("token", "")
+        safe_token = (
+            json.dumps(token)
+            .replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+            .replace("&", "\\u0026")
+        )
         return f"""<html><body style="font-family:sans-serif;max-width:400px;margin:60px auto;padding:20px">
             <h2>Новый пароль</h2>
             <input id="pwd" type="password" placeholder="Новый пароль (мин. 6 символов)"
@@ -269,7 +281,7 @@ def reset_password():
             async function resetPwd() {{
                 const res = await fetch('/reset-password', {{
                     method:'POST', headers:{{'Content-Type':'application/json'}},
-                    body: JSON.stringify({{token:'{token}', password: document.getElementById('pwd').value}})
+                    body: JSON.stringify({{token:{safe_token}, password: document.getElementById('pwd').value}})
                 }});
                 const d = await res.json();
                 document.getElementById('msg').textContent = d.message;
