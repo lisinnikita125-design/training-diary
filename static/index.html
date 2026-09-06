@@ -90,35 +90,51 @@
         td { border-bottom:1px solid var(--border); padding:6px 4px; text-align:center; vertical-align:middle; color:var(--text); }
         tr:last-child td { border-bottom:none; }
 
-        .set-weight,.set-input { width:48px; padding:5px 3px; font-size:15px; text-align:center; border:1.5px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); -webkit-appearance:none; }
-        .set-weight:focus,.set-input:focus { outline:none; border-color:var(--green); }
-        .difficulty-input { width:86px; padding:5px 6px; font-size:15px; border:1.5px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); }
+        .difficulty-input { width:86px; padding:5px 6px; font-size:15px; border:1.5px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); margin-top:8px; }
         .difficulty-input:focus { outline:none; border-color:var(--green); }
-        .set-cell-disabled { color:var(--border); font-size:16px; }
-        .tonazh-cell { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-weight:700; color:var(--green); white-space:nowrap; }
-        .ex-name { text-align:left; font-weight:500; min-width:110px; font-size:15px; }
-        .ex-model { color:var(--text2); font-size:15px; }
-        .prev-info { font-size:15px; color:var(--text2); display:block; margin-top:2px; }
+
+        /* Активный лог подходов */
+        .ex-block { padding:16px 0; }
+        .ex-header { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px; }
+        .ex-header .ex-name { font-size:16px; font-weight:600; color:var(--text); text-align:left; }
+        .ex-weight { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:34px; font-weight:700; color:var(--text); white-space:nowrap; }
+        .ex-weight .ex-weight-unit { font-family:'Inter',sans-serif; font-size:15px; font-weight:600; color:var(--text2); letter-spacing:0; margin-left:4px; }
+        .set-row { display:flex; align-items:center; gap:14px; min-height:52px; padding:6px 2px; cursor:pointer; }
+        .set-check { flex-shrink:0; width:26px; height:26px; border-radius:50%; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:14px; color:transparent; }
+        .set-row.done .set-check { background:var(--green); border-color:var(--green); color:#fff; }
+        .set-num { flex-shrink:0; width:16px; font-size:13px; color:var(--text2); text-align:center; }
+        .set-vals { margin-left:auto; display:flex; align-items:baseline; gap:8px; }
+        .set-val { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:26px; font-weight:700; color:var(--text2); padding:2px 4px; }
+        .set-row.done .set-val { color:var(--text); }
+        .set-x { font-size:16px; color:var(--text2); }
+        .set-val-input { font-family:var(--font-num); font-variant-numeric:tabular-nums; font-size:26px; font-weight:700; color:var(--text); width:64px; text-align:center; border:1.5px solid var(--green); border-radius:6px; background:var(--card); -webkit-appearance:none; }
+        .ex-prev-target { font-size:14px; color:var(--text2); line-height:1.7; margin-top:10px; }
+        .ex-block.skip-row { opacity:.5; }
 
         /* Таймер */
-        .timer-cell { white-space:nowrap; min-width:80px; }
         .timer-btn { background:none; border:1.5px solid var(--border); border-radius:6px; padding:4px 8px; font-size:15px; color:var(--text2); cursor:pointer; font-weight:500; }
         .timer-btn:hover { border-color:var(--green); color:var(--green); }
-        .timer-display { display:inline-block; font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:17px; font-weight:700; min-width:36px; text-align:center; }
-        .timer-display.running { color:var(--green); }
-        .timer-display.warning { color:#e65100; }
-        .timer-display.done { color:#c62828; }
 
         /* Пропуск упражнения */
-        .skip-row td { background:#2a2510 !important; }
         .skip-badge { font-size:15px; color:var(--text2); font-weight:600; display:block; }
         .skip-reason { font-size:15px; color:var(--text2); }
 
         /* Глобальный таймер */
-        #timerBanner { position:fixed; top:0; left:0; right:0; background:linear-gradient(135deg, #2C5570, var(--green)); color:white; text-align:center; padding:10px; font-size:18px; font-weight:700; z-index:200; transform:translateY(-100%); transition:transform .3s; cursor:pointer; }
-        #timerBanner.visible { transform:translateY(0); }
-        #timerBanner.warning { background:#ff3d00; }
-        #timerBanner.done { background:#dd2200; }
+        #restBar {
+            position:fixed; left:0; right:0; bottom:0;
+            background:rgba(30,33,40,0.72);
+            backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+            border-top:1px solid var(--border);
+            padding:14px 20px; text-align:center;
+            transform:translateY(100%); transition:transform .3s;
+            z-index:200; cursor:pointer;
+        }
+        #restBar.visible { transform:translateY(0); }
+        #restBar .rest-label { font-size:14px; color:var(--text2); }
+        #restBar .rest-num { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:36px; font-weight:700; color:var(--green); display:block; }
+        #restBar.warning .rest-num { color:#e65100; }
+        #restBar.done .rest-num { color:#c62828; }
+        body.rest-active { padding-bottom:90px; }
 
         /* Заметка */
         .workout-note { width:100%; padding:8px 10px; font-size:15px; border:1.5px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); resize:vertical; min-height:52px; margin-top:4px; }
@@ -239,7 +255,7 @@
 <body>
 
 <!-- Таймер баннер -->
-<div id="timerBanner" onclick="cancelGlobalTimer()">⏱ <span id="timerBannerText">—</span> · нажми чтобы отменить</div>
+<div id="restBar" onclick="cancelGlobalTimer()"><span class="rest-label">Отдых · нажми чтобы отменить</span><span class="rest-num" id="restBarNum">—</span></div>
 <div id="prBanner"></div>
 <div id="workoutTimer">⏱ <span id="workoutTimerText">0:00</span></div>
 
@@ -380,18 +396,7 @@
 
         <div id="exercisesSection" class="section hidden">
             <h2 id="dayName"></h2>
-            <div class="table-wrap">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Упражнение</th><th>Мод.</th><th>План</th>
-                            <th>П1</th><th>П2</th><th>П3</th><th>П4</th>
-                            <th>Слож.</th><th>⏱</th><th>Тоннаж</th>
-                        </tr>
-                    </thead>
-                    <tbody id="exercisesBody"></tbody>
-                </table>
-            </div>
+            <div id="exercisesBody"></div>
             <div style="margin-top:12px;">
                 <label style="font-size:15px;color:var(--text2);font-weight:600;">📝 Заметка к тренировке</label>
                 <textarea id="workoutNote" class="workout-note" placeholder="Как себя чувствовал, что болело, настроение..." oninput="saveTableState()"></textarea>
@@ -581,6 +586,8 @@ let weeklyChartInstance = null;
 let currentChartMode = 'weight';
 let currentStats = null;
 let globalTimer = null;
+let exerciseSets = {};
+let exerciseMeta = {};
 let historyData = [];
 
 
@@ -739,15 +746,13 @@ function saveTableState() {
     const note = document.getElementById('workoutNote').value;
     const rows = [];
 
-    document.querySelectorAll('#exercisesBody tr').forEach(row => {
-        const exId = row.dataset.exerciseId;
+    document.querySelectorAll('#exercisesBody .ex-block').forEach(block => {
+        const exId = block.dataset.exerciseId;
         if (!exId) return;
-        const weights = [...row.querySelectorAll('.set-weight')].map(i => i.value);
-        const reps = [...row.querySelectorAll('.set-input')].map(i => i.value);
-        const diff = row.querySelector('.difficulty-input')?.value || '';
-        const skipped = row.dataset.skipped || '';
-        const skipReason = row.dataset.skipReason || '';
-        rows.push({exId, weights, reps, diff, skipped, skipReason});
+        const diff = block.querySelector('.difficulty-input')?.value || '';
+        const skipped = block.dataset.skipped || '';
+        const skipReason = block.dataset.skipReason || '';
+        rows.push({exId, sets: exerciseSets[exId] || [], diff, skipped, skipReason});
     });
 
     const state = {dayId, note, rows, savedAt: Date.now()};
@@ -840,14 +845,11 @@ document.addEventListener('visibilitychange', () => {
         const remaining = Math.round((globalTimer.endTime - Date.now()) / 1000);
         if (remaining <= 0 && globalTimer) {
             clearInterval(globalTimer.interval);
-            if (globalTimer.displayEl) {
-                globalTimer.displayEl.textContent = '✓';
-                globalTimer.displayEl.className = 'timer-display done';
-            }
             if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
             playBeep();
             globalTimer = null;
-            document.getElementById('timerBanner').className = '';
+            document.getElementById('restBar').className = '';
+            document.body.classList.remove('rest-active');
         }
     }
 });
@@ -1101,66 +1103,42 @@ function showToast(msg, isError = false) {
 // ══════════════════════════════════════════════
 //  ТАЙМЕР
 // ══════════════════════════════════════════════
-function startTimer(seconds, displayEl) {
+function startTimer(seconds) {
     // Останавливаем предыдущий таймер
-    if (globalTimer) {
-        clearInterval(globalTimer.interval);
-        if (globalTimer.displayEl) {
-            globalTimer.displayEl.textContent = '▶';
-            globalTimer.displayEl.className = 'timer-display';
-        }
-    }
+    if (globalTimer) clearInterval(globalTimer.interval);
 
     // Используем абсолютное время — работает при заблокированном экране
     const endTime = Date.now() + seconds * 1000;
-    const banner = document.getElementById('timerBanner');
-    const bannerText = document.getElementById('timerBannerText');
+    const bar = document.getElementById('restBar');
+    const numEl = document.getElementById('restBarNum');
 
     function tick() {
         const remaining = Math.round((endTime - Date.now()) / 1000);
         if (remaining <= 0) {
             clearInterval(globalTimer.interval);
             globalTimer = null;
-            displayEl.textContent = '✓';
-            displayEl.className = 'timer-display done';
-            banner.className = 'visible done';
-            bannerText.textContent = 'Отдых окончен!';
+            numEl.textContent = '✓';
+            bar.className = 'visible done';
             if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
             playBeep();
-            setTimeout(() => {
-                banner.className = '';
-                displayEl.textContent = '▶';
-                displayEl.className = 'timer-display';
-            }, 3000);
+            setTimeout(() => { bar.className = ''; document.body.classList.remove('rest-active'); }, 3000);
             return;
         }
         const m = Math.floor(remaining / 60), s = remaining % 60;
         const ts = m > 0 ? `${m}:${String(s).padStart(2,'0')}` : `${s}с`;
-        displayEl.textContent = ts;
-        bannerText.textContent = `Отдых ${ts}`;
-        displayEl.className = 'timer-display ' + (remaining <= 10 ? 'warning' : 'running');
-        banner.className = 'visible ' + (remaining <= 10 ? 'warning' : '');
+        numEl.textContent = ts;
+        bar.className = 'visible ' + (remaining <= 10 ? 'warning' : '');
+        document.body.classList.add('rest-active');
     }
 
     tick();
     const interval = setInterval(tick, 500); // 500мс для точности после разблокировки
-    globalTimer = {interval, displayEl, endTime};
+    globalTimer = {interval, endTime};
 }
 function cancelGlobalTimer() {
-    if (globalTimer) { clearInterval(globalTimer.interval); if (globalTimer.displayEl) { globalTimer.displayEl.textContent = '▶'; globalTimer.displayEl.className = 'timer-display'; } globalTimer = null; }
-    document.getElementById('timerBanner').className = '';
-}
-function startTimerForRow(btn, seconds) { startTimer(seconds, btn.closest('tr').querySelector('.timer-display')); }
-
-function autoStartTimer(input, seconds) {
-    // Запускаем таймер автоматически когда введены повторения
-    const val = parseInt(input.value);
-    if (!val || val <= 0) return;
-    const row = input.closest('tr');
-    const displayEl = row.querySelector('.timer-display');
-    // Не перезапускаем если таймер уже идёт для этой же строки
-    if (globalTimer && globalTimer.displayEl === displayEl) return;
-    startTimer(seconds, displayEl);
+    if (globalTimer) { clearInterval(globalTimer.interval); globalTimer = null; }
+    document.getElementById('restBar').className = '';
+    document.body.classList.remove('rest-active');
 }
 function playBeep() {
     try {
@@ -1193,28 +1171,35 @@ async function repeatLastWorkout() {
         const dates = (datesData.by_day || {})[dayId] || [];
         if (dates.length === 0) { showToast('Нет предыдущих тренировок', true); return; }
         const lastDate = dates[0];
-        // Для каждой строки загружаем данные из той тренировки
-        const rows = document.querySelectorAll('#exercisesBody tr');
-        for (const row of rows) {
-            if (row.dataset.skipped) continue;
-            const exId = row.dataset.exerciseId;
-            const exName = row.dataset.exName;
+        // Для каждого упражнения загружаем данные из той тренировки
+        const blocks = document.querySelectorAll('#exercisesBody .ex-block');
+        for (const block of blocks) {
+            if (block.dataset.skipped) continue;
+            const exId = block.dataset.exerciseId;
+            const exName = block.dataset.exName;
             const resp = await fetch(`/progress-by-name?name=${encodeURIComponent(exName)}&limit=1`);
             const data = await resp.json();
             const lastSets = data.history.filter(h => h.workout_date === lastDate);
             if (lastSets.length === 0) continue;
-            const ws = row.querySelectorAll('.set-weight');
-            const rs = row.querySelectorAll('.set-input');
             lastSets.forEach((s, i) => {
-                if (i < ws.length) ws[i].value = s.weight;
-                if (i < rs.length) rs[i].value = s.reps;
+                if (exerciseSets[exId] && exerciseSets[exId][i]) {
+                    exerciseSets[exId][i].weight = s.weight;
+                    exerciseSets[exId][i].reps = s.reps;
+                    renderSetRowInto(exId, i);
+                }
             });
-            updateTonnage(ws[0]);
         }
+        updateTotalTonnage();
+        saveTableState();
         showToast(`✅ Заполнено из тренировки ${lastDate}`);
     } catch(e) {
         showToast('Ошибка загрузки', true);
     }
+}
+
+function parseRepsLower(rangeStr) {
+    const m = String(rangeStr || '').match(/\d+/);
+    return m ? parseInt(m[0]) : 0;
 }
 
 async function loadDay() {
@@ -1224,8 +1209,10 @@ async function loadDay() {
     const data = await resp.json();
     document.getElementById('dayName').textContent = data.day.name;
     document.getElementById('workoutNote').value = '';
-    const tbody = document.getElementById('exercisesBody');
-    tbody.innerHTML = '';
+    const container = document.getElementById('exercisesBody');
+    container.innerHTML = '';
+    exerciseSets = {};
+    exerciseMeta = {};
 
     // Запрашиваем wakeLock и подсказки параллельно
     requestWakeLock();
@@ -1242,44 +1229,50 @@ async function loadDay() {
         const lastWeight = lwData.weight ?? ex.default_weight;
         const planSets = ex.plan_sets || 4;
         const restSecs = ex.rest_seconds || 90;
+        const hint = hints[ex.name];
+        const targetWeight = hint?.suggested_weight ?? lastWeight;
+        const targetRepsLower = parseRepsLower(ex.plan_reps_range);
 
-        let prevInfo = '';
+        let previous = null;
         try {
             const prev = await (await fetch(`/progress-by-name?name=${encodeURIComponent(ex.name)}&limit=1`)).json();
             if (prev.history?.length > 0) {
-                const l = prev.history[0];
-                prevInfo = `прошлый раз: ${l.reps} повт · ${l.workout_date}`;
+                const lastDate = prev.history[0].workout_date;
+                const sameDay = prev.history.filter(h => h.workout_date === lastDate);
+                previous = { weight: prev.history[0].weight, reps: prev.history[0].reps, sets: sameDay.length };
             }
         } catch(e) {}
 
-        let setsCells = '';
-        for (let i = 1; i <= 4; i++) {
-            setsCells += i <= planSets
-                ? `<td style="white-space:nowrap;min-width:60px;">
-                    <input type="number" class="set-weight" value="${lastWeight}" step="0.5" inputmode="decimal" oninput="updateTonnage(this)" style="width:54px;margin-bottom:3px;display:block;margin:0 auto 3px;">
-                    <input type="number" class="set-input" placeholder="повт" inputmode="numeric" oninput="updateTonnage(this)" onblur="autoStartTimer(this, ${restSecs})" style="width:54px;display:block;margin:0 auto;">
-                  </td>`
-                : `<td class="set-cell-disabled">—</td>`;
+        exerciseMeta[ex.id] = { planSets, restSecs, name: ex.name };
+        exerciseSets[ex.id] = Array.from({length: planSets}, () => ({ weight: targetWeight, reps: targetRepsLower, done: false }));
+
+        if (container.children.length > 0) {
+            const sep = document.createElement('div');
+            sep.className = 'divider';
+            container.appendChild(sep);
         }
 
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td class="ex-name">${ex.name}${prevInfo ? `<span class="prev-info">${prevInfo}</span>` : ''}</td>
-            <td class="ex-model">${ex.machine_model}</td>
-            <td>${ex.plan_sets}×${ex.plan_reps_range}</td>
-            ${setsCells}
-            <td><input type="text" class="difficulty-input" placeholder="Легко/Тяжело" oninput="saveTableState()"></td>
-            <td class="timer-cell">
-                <button class="timer-btn" onclick="startTimerForRow(this,${restSecs})">▶ ${restSecs}с</button>
-                <span class="timer-display"></span>
-            </td>
-            <td class="tonazh-cell">0 кг</td>
+        let setsHtml = '';
+        for (let i = 0; i < planSets; i++) setsHtml += buildSetRowHTML(ex.id, i);
+
+        const block = document.createElement('div');
+        block.className = 'ex-block';
+        block.dataset.exerciseId = ex.id;
+        block.dataset.exName = ex.name;
+        block.innerHTML = `
+            <div class="ex-header">
+                <div class="ex-name">${ex.name}</div>
+                <div class="ex-weight">${targetWeight}<span class="ex-weight-unit">кг</span></div>
+            </div>
+            ${setsHtml}
+            <input type="text" class="difficulty-input" placeholder="Легко/Тяжело" oninput="saveTableState()">
+            <div class="divider"></div>
+            <div class="ex-prev-target">
+                <div>Предыдущая: ${previous ? `${previous.weight} × ${previous.reps} × ${previous.sets}` : '—'}</div>
+                <div>Цель: ${targetWeight} × ${ex.plan_reps_range} × ${planSets}</div>
+            </div>
         `;
-        row.dataset.exerciseId = ex.id;
-        row.dataset.planSets = planSets;
-        row.dataset.exName = ex.name;
-        row.dataset.restSecs = restSecs;
-        tbody.appendChild(row);
+        container.appendChild(block);
     }
     document.getElementById('exercisesSection').classList.remove('hidden');
     document.getElementById('exercisesSection').scrollIntoView({behavior:'smooth', block:'start'});
@@ -1297,23 +1290,26 @@ async function loadDayWithRestore() {
             await loadDay();
             // Восстанавливаем значения
             setTimeout(() => {
-                const rows = document.querySelectorAll('#exercisesBody tr');
-                rows.forEach((row, idx) => {
-                    if (idx >= state.rows.length) return;
-                    const saved = state.rows[idx];
-                    const ws = row.querySelectorAll('.set-weight');
-                    const rs = row.querySelectorAll('.set-input');
-                    saved.weights.forEach((w, i) => { if (ws[i]) ws[i].value = w; });
-                    saved.reps.forEach((r, i) => { if (rs[i]) rs[i].value = r; });
-                    const diff = row.querySelector('.difficulty-input');
-                    if (diff) diff.value = saved.diff;
-                    if (saved.skipped) {
-                        row.dataset.skipped = '1';
-                        row.dataset.skipReason = saved.skipReason;
+                state.rows.forEach(saved => {
+                    const exId = saved.exId;
+                    if (!exerciseSets[exId]) return;
+                    (saved.sets || []).forEach((s, i) => {
+                        if (exerciseSets[exId][i]) {
+                            exerciseSets[exId][i].weight = s.weight;
+                            exerciseSets[exId][i].reps = s.reps;
+                            exerciseSets[exId][i].done = !!s.done;
+                            renderSetRowInto(exId, i);
+                        }
+                    });
+                    const block = document.querySelector(`.ex-block[data-exercise-id="${exId}"]`);
+                    if (block) {
+                        const diff = block.querySelector('.difficulty-input');
+                        if (diff) diff.value = saved.diff;
+                        if (saved.skipped) applySkipState(block, true, saved.skipReason);
                     }
-                    updateTonnage(ws[0] || rs[0]);
                 });
                 document.getElementById('workoutNote').value = state.note || '';
+                updateTotalTonnage();
                 showToast('✅ Данные восстановлены');
             }, 500);
             return;
@@ -1325,66 +1321,117 @@ async function loadDayWithRestore() {
 // ══════════════════════════════════════════════
 //  ПРОПУСК УПРАЖНЕНИЯ
 // ══════════════════════════════════════════════
+function applySkipState(block, skipped, reason) {
+    if (skipped) {
+        block.classList.add('skip-row');
+        block.dataset.skipped = '1';
+        block.dataset.skipReason = reason || '';
+    } else {
+        block.classList.remove('skip-row');
+        delete block.dataset.skipped;
+        delete block.dataset.skipReason;
+    }
+    const diff = block.querySelector('.difficulty-input');
+    if (diff) diff.disabled = !!skipped;
+}
 function skipExercise(btn) {
-    const row = btn.closest('tr');
-    const reason = prompt(`Пропустить "${row.dataset.exName}"?\nПричина (необязательно):`);
+    const block = btn.closest('.ex-block');
+    const reason = prompt(`Пропустить "${block.dataset.exName}"?\nПричина (необязательно):`);
     if (reason === null) return; // отмена
-    row.classList.add('skip-row');
-    row.dataset.skipped = '1';
-    row.dataset.skipReason = reason;
-    // Блокируем поля
-    row.querySelectorAll('.set-weight,.set-input,.difficulty-input').forEach(el => { el.disabled = true; el.style.opacity = '.4'; });
+    applySkipState(block, true, reason);
     btn.textContent = '↩ Вернуть';
     btn.onclick = () => unskipExercise(btn);
-    const tonCell = row.querySelector('.tonazh-cell');
-    tonCell.innerHTML = `<span class="skip-badge">пропущено</span>${reason ? `<span class="skip-reason">${reason}</span>` : ''}`;
+    updateTotalTonnage();
 }
 function unskipExercise(btn) {
-    const row = btn.closest('tr');
-    row.classList.remove('skip-row');
-    delete row.dataset.skipped;
-    delete row.dataset.skipReason;
-    row.querySelectorAll('.set-weight,.set-input,.difficulty-input').forEach(el => { el.disabled = false; el.style.opacity = '1'; });
+    const block = btn.closest('.ex-block');
+    applySkipState(block, false);
     btn.textContent = '⊘ Пропустить';
     btn.onclick = () => skipExercise(btn);
-    row.querySelector('.tonazh-cell').textContent = '0 кг';
     updateTotalTonnage();
 }
 
 // ══════════════════════════════════════════════
-//  ТОННАЖ
+//  АКТИВНЫЙ ЛОГ ПОДХОДОВ
 // ══════════════════════════════════════════════
 
-function updateTonnage(input) {
-    const row = input.closest('tr');
-    const ws = row.querySelectorAll('.set-weight'), rs = row.querySelectorAll('.set-input');
-    let total = 0, done = 0;
-    const planSets = parseInt(row.dataset.planSets) || 4;
-    for (let i = 0; i < Math.min(ws.length, rs.length); i++) {
-        const r = parseInt(rs[i].value) || 0;
-        total += (parseFloat(ws[i].value)||0) * r;
-        if (r > 0) done++;
-    }
-    row.querySelector('.tonazh-cell').textContent = total + ' кг';
-    const exId = row.dataset.exerciseId;
-    const counter = document.getElementById(`counter-${exId}`);
-    if (counter) {
-        counter.textContent = `${done}/${planSets}`;
-        counter.className = done >= planSets ? 'sets-counter complete' : 'sets-counter';
-    }
+function buildSetRowHTML(exId, idx) {
+    const s = exerciseSets[exId][idx];
+    return `<div class="set-row${s.done ? ' done' : ''}" id="set-${exId}-${idx}" onclick="toggleSetDone(${exId},${idx})">
+        <span class="set-check">✓</span>
+        <span class="set-num">${idx + 1}</span>
+        <span class="set-vals">
+            <span class="set-val" onclick="event.stopPropagation();editSetValue(${exId},${idx},'weight',this)">${s.weight}</span>
+            <span class="set-x">×</span>
+            <span class="set-val" onclick="event.stopPropagation();editSetValue(${exId},${idx},'reps',this)">${s.reps}</span>
+        </span>
+    </div>`;
+}
+
+function renderSetRowInto(exId, idx) {
+    const el = document.getElementById(`set-${exId}-${idx}`);
+    if (!el) return;
+    const s = exerciseSets[exId][idx];
+    el.classList.toggle('done', !!s.done);
+    const vals = el.querySelectorAll('.set-val');
+    vals[0].textContent = s.weight;
+    vals[1].textContent = s.reps;
+}
+
+function toggleSetDone(exId, idx) {
+    const block = document.querySelector(`.ex-block[data-exercise-id="${exId}"]`);
+    if (block && block.dataset.skipped) return;
+    const st = exerciseSets[exId][idx];
+    st.done = !st.done;
+    renderSetRowInto(exId, idx);
     updateTotalTonnage();
-    // Сохраняем состояние при каждом изменении
     saveTableState();
+    if (st.done) {
+        const hasMorePending = exerciseSets[exId].some(s => !s.done);
+        if (hasMorePending) startTimer(exerciseMeta[exId].restSecs);
+    }
 }
+
+function editSetValue(exId, idx, field, el) {
+    const block = document.querySelector(`.ex-block[data-exercise-id="${exId}"]`);
+    if (block && block.dataset.skipped) return;
+    if (el.querySelector('input')) return;
+    const current = exerciseSets[exId][idx][field];
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'set-val-input';
+    input.value = current;
+    input.min = '0';
+    input.step = field === 'weight' ? '0.5' : '1';
+    input.inputMode = field === 'weight' ? 'decimal' : 'numeric';
+    const commit = () => {
+        exerciseSets[exId][idx][field] = parseFloat(input.value) || 0;
+        renderSetRowInto(exId, idx);
+        updateTotalTonnage();
+        saveTableState();
+    };
+    input.onblur = commit;
+    input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); };
+    input.onclick = (e) => e.stopPropagation();
+    el.textContent = '';
+    el.appendChild(input);
+    input.focus();
+    input.select();
+}
+
 function updateTotalTonnage() {
     let total = 0;
-    document.querySelectorAll('#exercisesBody tr:not(.skip-row) .tonazh-cell').forEach(c => { total += parseFloat(c.textContent)||0; });
+    document.querySelectorAll('#exercisesBody .ex-block').forEach(block => {
+        if (block.dataset.skipped) return;
+        const exId = block.dataset.exerciseId;
+        (exerciseSets[exId] || []).forEach(s => { if (s.done) total += (s.weight || 0) * (s.reps || 0); });
+    });
     document.getElementById('totalTonnageVal').textContent = total;
 }
 function closeWorkout() {
     const section = document.getElementById('exercisesSection');
     if (section.classList.contains('hidden')) return;
-    const hasData = [...document.querySelectorAll('.set-input')].some(i => i.value > 0);
+    const hasData = Object.values(exerciseSets).some(sets => sets.some(s => s.done));
     if (hasData) {
         if (!confirm('Закрыть таблицу? Данные не сохранятся (но останутся если вернётесь).')) return;
     }
@@ -1410,29 +1457,24 @@ async function saveWorkout() {
     const note = document.getElementById('workoutNote').value.trim();
     const exercises = [];
 
-    document.querySelectorAll('#exercisesBody tr').forEach(row => {
-        const exId = row.dataset.exerciseId;
-        if (row.dataset.skipped) {
-            exercises.push({exercise_id: parseInt(exId), skipped: true, skip_reason: row.dataset.skipReason || ''});
+    document.querySelectorAll('#exercisesBody .ex-block').forEach(block => {
+        const exId = block.dataset.exerciseId;
+        if (block.dataset.skipped) {
+            exercises.push({exercise_id: parseInt(exId), skipped: true, skip_reason: block.dataset.skipReason || ''});
             return;
         }
-        const planSets = parseInt(row.dataset.planSets)||4;
-        const ws = row.querySelectorAll('.set-weight'), rs = row.querySelectorAll('.set-input');
-        const diff = row.querySelector('.difficulty-input');
+        const diff = block.querySelector('.difficulty-input');
         const sets = [];
-        for (let i = 0; i < Math.min(planSets, ws.length); i++) {
-            const reps = parseInt(rs[i].value)||0;
-            const weight = parseFloat(ws[i].value)||0;
-            if (reps < 0 || weight < 0) { showToast('Вес и повторения не могут быть отрицательными', true); saveButton.disabled = false; saveButton.textContent = '💾 Сохранить'; isSaving = false; return; }
-            if (reps > 0 && weight > 0) sets.push({set_number:i+1, weight, reps, difficulty:diff?.value||null, notes:note||null});
-            else if (reps > 0 && weight === 0) sets.push({set_number:i+1, weight:0, reps, difficulty:diff?.value||null, notes:note||null});
-        }
-        if (sets.length > 0) exercises.push({exercise_id:parseInt(exId), sets});
+        (exerciseSets[exId] || []).forEach((s, i) => {
+            if (!s.done) return;
+            sets.push({set_number: i + 1, weight: s.weight || 0, reps: s.reps || 0, difficulty: diff?.value || null, notes: note || null});
+        });
+        if (sets.length > 0) exercises.push({exercise_id: parseInt(exId), sets});
     });
 
     if (exercises.filter(e => !e.skipped).length === 0) {
-        showToast('Заполните хотя бы одно упражнение', true);
-        saveButton.disabled = false; saveButton.textContent = '💾 Сохранить'; return;
+        showToast('Отметьте хотя бы один подход', true);
+        saveButton.disabled = false; saveButton.textContent = '💾 Сохранить'; isSaving = false; return;
     }
     const date = new Date().toISOString().split('T')[0];
     try {
@@ -1442,10 +1484,10 @@ async function saveWorkout() {
                     showToast('✅ Сохранено!' + (duration ? ' Время: ' + duration : ''));
                     clearTableState();
                     checkPR(date);
-            document.querySelectorAll('#exercisesBody tr').forEach(row => {
-                row.querySelectorAll('.set-input').forEach(i => i.value='');
-                const d = row.querySelector('.difficulty-input'); if(d) d.value='';
-                if (!row.dataset.skipped) row.querySelector('.tonazh-cell').textContent='0 кг';
+            document.querySelectorAll('#exercisesBody .ex-block').forEach(block => {
+                const exId = block.dataset.exerciseId;
+                (exerciseSets[exId] || []).forEach((s, i) => { s.done = false; renderSetRowInto(exId, i); });
+                const d = block.querySelector('.difficulty-input'); if(d) d.value='';
             });
             document.getElementById('workoutNote').value = '';
             updateTotalTonnage();
