@@ -167,6 +167,34 @@ def init_db():
     except Exception:
         pass
 
+    # day_templates: visibility/owner_user_id — видимость дней по пользователям
+    try:
+        cur.execute("ALTER TABLE day_templates ADD COLUMN visibility TEXT DEFAULT 'all'")
+    except Exception:
+        pass
+
+    try:
+        cur.execute("ALTER TABLE day_templates ADD COLUMN owner_user_id INTEGER REFERENCES users(id)")
+    except Exception:
+        pass
+
+    # day_visibility: кастомный список пользователей, которым доступен день (visibility='custom')
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS day_visibility (
+            day_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            PRIMARY KEY (day_id, user_id),
+            FOREIGN KEY (day_id) REFERENCES day_templates(id),
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+
+    # exercises: origin_exercise_id — связь копии упражнения с исходником (для проброса изменений админом)
+    try:
+        cur.execute("ALTER TABLE exercises ADD COLUMN origin_exercise_id INTEGER REFERENCES exercises(id)")
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
 
