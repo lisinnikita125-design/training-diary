@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, abort, session, Response
 from database import get_db, init_db, seed_user
-import os, shutil, csv, io, secrets
+import os, shutil, csv, io, secrets, json
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -257,6 +257,12 @@ def forgot_password():
 def reset_password():
     if request.method == "GET":
         token = request.args.get("token", "")
+        safe_token = (
+            json.dumps(token)
+            .replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+            .replace("&", "\\u0026")
+        )
         return f"""<html><body style="font-family:sans-serif;max-width:400px;margin:60px auto;padding:20px">
             <h2>Новый пароль</h2>
             <input id="pwd" type="password" placeholder="Новый пароль (мин. 6 символов)"
@@ -269,7 +275,7 @@ def reset_password():
             async function resetPwd() {{
                 const res = await fetch('/reset-password', {{
                     method:'POST', headers:{{'Content-Type':'application/json'}},
-                    body: JSON.stringify({{token:'{token}', password: document.getElementById('pwd').value}})
+                    body: JSON.stringify({{token:{safe_token}, password: document.getElementById('pwd').value}})
                 }});
                 const d = await res.json();
                 document.getElementById('msg').textContent = d.message;
