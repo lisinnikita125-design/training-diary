@@ -88,7 +88,7 @@
 
         /* Пропуск упражнения */
         .skip-row td { background:#2a2510 !important; }
-        .skip-badge { font-size:15px; color:#e65100; font-weight:600; display:block; }
+        .skip-badge { font-size:15px; color:var(--text2); font-weight:600; display:block; }
         .skip-reason { font-size:15px; color:var(--text2); }
 
         /* Глобальный таймер */
@@ -142,9 +142,9 @@
             margin-top: 3px;
             font-weight: 600;
         }
-        .hint-increase { background: #fff0f0; color: var(--green); }
-        .hint-ready    { background: #fff8f0; color: #c05000; }
-        .hint-hold     { background: #f5f5f5; color: #888888; }
+        .hint-increase { background: var(--gl); color: var(--green); }
+        .hint-ready    { background: var(--border); color: var(--text); }
+        .hint-hold     { background: var(--card); color: var(--text2); }
 
         /* Счётчик подходов */
         .sets-counter {
@@ -421,11 +421,11 @@
                 </a>
             </div>
             
-            <div id="reminderBanner" class="hidden" style="background:#fff3e0;border-radius:10px;padding:12px 16px;margin-top:12px;display:flex;align-items:center;gap:10px;">
+            <div id="reminderBanner" class="hidden" style="background:var(--gl);border-radius:10px;padding:12px 16px;margin-top:12px;display:flex;align-items:center;gap:10px;">
                 <span style="font-size:22px;">⏰</span>
                 <div>
-                    <div style="font-weight:600;color:#e65100;" id="reminderText">Давно не тренировался!</div>
-                    <div style="font-size:15px;color:#888;" id="reminderSub"></div>
+                    <div style="font-weight:600;color:var(--text);" id="reminderText">Давно не тренировался!</div>
+                    <div style="font-size:15px;color:var(--text2);" id="reminderSub"></div>
                 </div>
                 <button class="btn-secondary btn-sm" style="margin-left:auto;" onclick="requestNotifications()">🔔 Включить напоминания</button>
             </div>
