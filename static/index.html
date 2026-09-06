@@ -60,6 +60,29 @@
         .theme-toggle { background:none; border:1.5px solid var(--border); border-radius:20px; padding:6px 12px; font-size:15px; color:var(--text2); cursor:pointer; }
         .btn-sm { padding:4px 10px; font-size:15px; }
 
+        /* Сводка дня */
+        .divider { border-top:1px solid var(--border); margin:14px 0; }
+        #wsDate { font-size:15px; color:var(--text2); }
+        #wsDayTitle { font-size:28px; font-weight:700; color:var(--text); margin:2px 0 4px; letter-spacing:-0.3px; }
+        #wsMuscleGroups { font-size:15px; color:var(--text2); }
+        .ws-label { font-size:15px; color:var(--text2); }
+        #wsExerciseName { font-size:18px; font-weight:700; color:var(--text); margin-top:2px; }
+        #wsWeightLine { display:flex; align-items:baseline; gap:8px; margin-top:4px; }
+        #wsWeightLine .num { font-size:40px; font-weight:700; color:var(--text); }
+        #wsWeightLine .ws-arrow { font-size:20px; color:var(--text2); }
+        #wsWeightLine .ws-unit { font-size:16px; font-weight:600; color:var(--text2); }
+        #wsSetsReps { font-size:15px; color:var(--text2); margin-top:4px; }
+        .btn-hero { display:block; width:100%; height:50px; border:none; border-radius:11px; background:var(--green); color:#fff; font-size:16px; font-weight:600; cursor:pointer; box-shadow:none; margin-top:14px; }
+        .btn-hero:hover { opacity:.9; }
+        .btn-hero:disabled { opacity:.5; cursor:not-allowed; }
+        .ws-week-row { display:flex; gap:28px; }
+        .ws-week-stat .num { font-size:28px; font-weight:700; color:var(--text); }
+        .ws-week-delta { font-size:15px; color:var(--text2); }
+        .ws-week-stat .ws-label { margin-top:2px; }
+        .ws-pr-row { display:flex; justify-content:space-between; align-items:center; margin-top:4px; }
+        #wsPrName { font-size:16px; font-weight:600; color:var(--text); }
+        #wsPrValue { font-size:20px; font-weight:700; color:var(--record); }
+
         /* Таблица */
         .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
         table { width:100%; border-collapse:collapse; min-width:540px; font-size:15px; }
@@ -307,6 +330,42 @@
 
     <!-- ═══ ТРЕНИРОВКА ═══ -->
     <div id="tab-workout">
+        <div id="workoutSummary" class="hidden">
+            <div id="wsDate">Сегодня</div>
+            <div id="wsDayTitle">—</div>
+            <div id="wsMuscleGroups"></div>
+
+            <div class="divider"></div>
+
+            <div class="ws-label">Следующая</div>
+            <div id="wsExerciseName">—</div>
+            <div id="wsWeightLine"></div>
+            <div id="wsSetsReps"></div>
+
+            <button id="wsStartBtn" class="btn-hero" onclick="startSuggestedWorkout()">Начать тренировку</button>
+
+            <div class="divider"></div>
+
+            <div class="ws-week-row">
+                <div class="ws-week-stat">
+                    <span class="num" id="wsWeekCount">—</span>
+                    <div class="ws-label">тренировки</div>
+                </div>
+                <div class="ws-week-stat">
+                    <span class="num" id="wsWeekTonnage">—</span><span class="ws-week-delta" id="wsWeekDelta"></span>
+                    <div class="ws-label">тоннаж за неделю</div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="ws-label">Недавний рекорд</div>
+            <div class="ws-pr-row">
+                <div id="wsPrName">—</div>
+                <div id="wsPrValue">—</div>
+            </div>
+        </div>
+
         <div class="section">
             <div class="day-controls">
                 <select id="daySelect">
@@ -810,11 +869,142 @@ window.onload = async () => {
         if (ws) ws.style.display = 'none';
         fillExerciseSelect();
         checkAdminAccess();
+        loadWorkoutSummary();
         // Проверяем напоминание при входе
         const rem = await fetch('/check-reminder').then(r=>r.json()).catch(()=>({}));
         if (rem.days_since >= 3) maybeNotify(rem.days_since);
     }
 };
+
+// ══════════════════════════════════════════════
+//  СВОДКА ДНЯ
+// ══════════════════════════════════════════════
+function parseDayMeta(name) {
+    const rest = (name || '').replace(/^День\s*\d+\s*[–—-]\s*/i, '').trim();
+    const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '';
+    const m = rest.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+    if (m) {
+        return { title: cap(m[1].trim()), groups: m[2].split(',').map(s => cap(s.trim())) };
+    }
+    return { title: cap(rest.replace(/\s*\+\s*/g, ' + ')), groups: [] };
+}
+
+function pickTargetDay(days, byDay) {
+    if (!days.length) return null;
+    let best = days[0], bestLast = (byDay[String(days[0].id)] || [])[0] || '';
+    for (const d of days.slice(1)) {
+        const last = (byDay[String(d.id)] || [])[0] || '';
+        if (last < bestLast) { best = d; bestLast = last; }
+    }
+    return best;
+}
+
+let wsTarget = null;
+
+async function loadWorkoutSummary() {
+    const box = document.getElementById('workoutSummary');
+    const now = new Date();
+    document.getElementById('wsDate').textContent = 'Сегодня · ' + now.getDate() + ' ' +
+        ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'][now.getMonth()];
+
+    try {
+        const [days, datesData] = await Promise.all([
+            fetch('/days').then(r => r.json()),
+            fetch('/workout-dates').then(r => r.json())
+        ]);
+        wsTarget = pickTargetDay(days, datesData.by_day || {});
+        if (!wsTarget) { box.classList.add('hidden'); return; }
+        box.classList.remove('hidden');
+
+        const meta = parseDayMeta(wsTarget.name);
+        document.getElementById('wsDayTitle').textContent = meta.title;
+        const groupsEl = document.getElementById('wsMuscleGroups');
+        groupsEl.textContent = meta.groups.join(' · ');
+        groupsEl.classList.toggle('hidden', meta.groups.length === 0);
+
+        try {
+            const dayData = await fetch('/day/' + wsTarget.id).then(r => r.json());
+            const ex = (dayData.exercises || [])[0];
+            const nameEl = document.getElementById('wsExerciseName');
+            const setsEl = document.getElementById('wsSetsReps');
+            const lineEl = document.getElementById('wsWeightLine');
+            if (ex) {
+                nameEl.textContent = ex.name;
+                setsEl.textContent = ex.plan_sets + '×' + ex.plan_reps_range;
+                const [weightData, hintsData] = await Promise.all([
+                    fetch('/last-weight/' + ex.id).then(r => r.json()),
+                    fetch('/progression-hints').then(r => r.json())
+                ]);
+                const current = weightData.weight;
+                const hint = (hintsData.hints || {})[ex.name];
+                if (hint && hint.suggested_weight !== current) {
+                    lineEl.innerHTML = `<span class="num">${current}</span><span class="ws-arrow">→</span><span class="num">${hint.suggested_weight}</span><span class="ws-unit">кг</span>`;
+                } else {
+                    lineEl.innerHTML = `<span class="num">${current}</span><span class="ws-unit">кг</span>`;
+                }
+            } else {
+                nameEl.textContent = 'Упражнений пока нет';
+                setsEl.textContent = '';
+                lineEl.innerHTML = '';
+            }
+        } catch(e) {}
+    } catch(e) {
+        box.classList.add('hidden');
+        return;
+    }
+
+    try {
+        const histData = await fetch('/workout-history').then(r => r.json());
+        const history = histData.history || [];
+        const dayMs = 86400000;
+        const today = new Date(); today.setHours(0,0,0,0);
+        const weekday = (today.getDay() + 6) % 7; // 0 = понедельник
+        const curStart = new Date(today.getTime() - weekday * dayMs);
+        const prevStart = new Date(curStart.getTime() - 7 * dayMs);
+        let curCount = 0, curTon = 0, prevTon = 0;
+        history.forEach(w => {
+            const d = new Date(w.date + 'T00:00:00');
+            if (d >= curStart) { curCount++; curTon += w.total_tonnage; }
+            else if (d >= prevStart) { prevTon += w.total_tonnage; }
+        });
+        document.getElementById('wsWeekCount').textContent = curCount;
+        document.getElementById('wsWeekTonnage').textContent = Math.round(curTon).toLocaleString('ru-RU') + ' кг';
+        const deltaEl = document.getElementById('wsWeekDelta');
+        if (prevTon > 0) {
+            const pct = ((curTon - prevTon) / prevTon) * 100;
+            deltaEl.textContent = ' · ' + (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+        } else {
+            deltaEl.textContent = '';
+        }
+    } catch(e) {}
+
+    try {
+        const prsData = await fetch('/prs').then(r => r.json());
+        const prs = (prsData.prs || []).slice().sort((a, b) => b.date.localeCompare(a.date));
+        if (prs.length) {
+            document.getElementById('wsPrName').textContent = prs[0].name;
+            document.getElementById('wsPrValue').textContent = prs[0].weight + ' кг';
+        } else {
+            document.getElementById('wsPrName').textContent = 'Пока нет рекордов';
+            document.getElementById('wsPrValue').textContent = '';
+        }
+    } catch(e) {}
+}
+
+async function startSuggestedWorkout() {
+    if (!wsTarget) return;
+    const sel = document.getElementById('daySelect');
+    let opt = sel.querySelector(`option[value="${wsTarget.id}"]`);
+    if (!opt) {
+        opt = document.createElement('option');
+        opt.value = wsTarget.id;
+        opt.textContent = wsTarget.name;
+        sel.appendChild(opt);
+    }
+    sel.value = String(wsTarget.id);
+    await loadDayWithRestore();
+    document.getElementById('exercisesSection').scrollIntoView({behavior:'smooth'});
+}
 
 // ══════════════════════════════════════════════
 //  НАВИГАЦИЯ
@@ -894,6 +1084,7 @@ function showTab(name) {
     if (name === 'stats') loadStats();
     if (name === 'compare') loadCompareDates();
     if (name === 'history') loadWorkoutHistory();
+    if (name === 'workout') loadWorkoutSummary();
 }
 
 // ══════════════════════════════════════════════
