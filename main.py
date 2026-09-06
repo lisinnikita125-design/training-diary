@@ -48,13 +48,17 @@ _seed_existing_users()
 import logging, os
 from logging.handlers import RotatingFileHandler
 
-os.makedirs('/home/NikitaLisin/logs', exist_ok=True)
-log_handler = RotatingFileHandler(
-    '/home/NikitaLisin/logs/app.log',
-    maxBytes=1024*1024,
-    backupCount=5,
-    encoding='utf-8'
-)
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+try:
+    os.makedirs(LOG_DIR, exist_ok=True)
+    log_handler = RotatingFileHandler(
+        os.path.join(LOG_DIR, 'app.log'),
+        maxBytes=1024*1024,
+        backupCount=5,
+        encoding='utf-8'
+    )
+except OSError:
+    log_handler = logging.StreamHandler()
 log_handler.setFormatter(logging.Formatter(
     '%(asctime)s [%(levelname)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
@@ -84,10 +88,6 @@ def migrate_existing_data():
     if first_user:
         uid = first_user["id"]
         cur.execute("UPDATE workout_log SET user_id = ? WHERE user_id IS NULL", (uid,))
-        try:
-            cur.execute("UPDATE recovery_log SET user_id = ? WHERE user_id IS NULL", (uid,))
-        except Exception:
-            pass
         conn.commit()
     conn.close()
 
@@ -398,7 +398,6 @@ def admin_delete_user(user_id):
         return jsonify({"status": "error", "message": "Нельзя удалить себя"}), 400
     conn = get_db()
     conn.execute("DELETE FROM workout_log WHERE user_id=?", (user_id,))
-    conn.execute("DELETE FROM recovery_log WHERE user_id=?", (user_id,))
     conn.execute("DELETE FROM exercises WHERE user_id=?", (user_id,))
     conn.execute("DELETE FROM users WHERE id=?", (user_id,))
     conn.commit()
@@ -1218,26 +1217,6 @@ def last_workout_days():
     return jsonify({"dates": [r["workout_date"] for r in rows]})
 
 
-@app.route("/personal-records")
-def personal_records():
-    """Личные рекорды — максимальный вес по каждому упражнению за всё время."""
-    require_auth()
-    conn = get_db()
-    cur = conn.cursor()
-    uid = current_user_id()
-    rows = cur.execute("""
-        SELECT e.name, MAX(wl.weight) as max_weight, wl.workout_date
-        FROM workout_log wl
-        JOIN exercises e ON e.id = wl.exercise_id
-        WHERE wl.set_number > 0 AND wl.weight > 0
-          AND wl.user_id = ?
-        GROUP BY e.name
-        ORDER BY e.name
-    """, (uid,)).fetchall()
-    conn.close()
-    return jsonify({"records": [dict(r) for r in rows]})
-
-
 @app.route("/progress-by-name-grouped")
 def get_progress_grouped():
     """История подходов сгруппированная по датам."""
@@ -1327,55 +1306,6 @@ def progression_hints():
             }
 
     return jsonify({"hints": hints})
-
-# ══════════════════════════════════════════════
-#  RECOVERY — сохранение показателей самочувствия
-# ══════════════════════════════════════════════
-
-
-@app.route("/recovery", methods=["POST"])
-def save_recovery():
-    require_auth()
-    data = request.get_json() or {}
-    date = data.get("date", datetime.now().strftime("%Y-%m-%d"))
-    conn = get_db()
-    cur = conn.cursor()
-    uid = current_user_id()
-    cur.execute("""
-        INSERT INTO recovery_log (user_id, log_date, sleep, energy, stress, notes)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(user_id, log_date) DO UPDATE SET
-            sleep = excluded.sleep,
-            energy = excluded.energy,
-            stress = excluded.stress,
-            notes = excluded.notes
-    """, (uid, date, data.get("sleep"), data.get("energy"), data.get("stress"), data.get("notes")))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "ok"})
-
-
-@app.route("/recovery-history")
-def recovery_history():
-    require_auth()
-    conn = get_db()
-    cur = conn.cursor()
-    uid = current_user_id()
-    rows = cur.execute("""
-        SELECT r.log_date, r.sleep, r.energy, r.stress,
-               COUNT(DISTINCT wl.exercise_id) as exercises_count,
-               COALESCE(SUM(wl.weight * wl.reps), 0) as tonnage
-        FROM recovery_log r
-        LEFT JOIN workout_log wl ON wl.workout_date = r.log_date AND wl.set_number > 0
-          AND wl.user_id = ?
-        WHERE r.user_id = ?
-        GROUP BY r.log_date
-        ORDER BY r.log_date DESC
-        LIMIT 30
-    """, (uid, uid)).fetchall()
-    conn.close()
-    return jsonify({"history": [dict(r) for r in rows]})
-
 
 # ══════════════════════════════════════════════
 #  PR-СИСТЕМА — личные рекорды при сохранении
@@ -1571,19 +1501,6 @@ def get_achievements():
         )
     """, (uid, uid)).fetchone()
 
-    # ── Режим: самочувствие 7 дней подряд ───────────────────────────────────
-    recovery_dates = [r["log_date"] for r in conn.execute(
-        "SELECT DISTINCT log_date FROM recovery_log WHERE user_id=? ORDER BY log_date", (uid,)
-    ).fetchall()]
-    regime_date = None
-    if len(recovery_dates) >= 7:
-        for i in range(len(recovery_dates) - 6):
-            d0 = date.fromisoformat(recovery_dates[i])
-            d6 = date.fromisoformat(recovery_dates[i + 6])
-            if (d6 - d0).days == 6:
-                regime_date = recovery_dates[i + 6]
-                break
-
     # ── Баланс: всегда ≥2 дня между тренировками (мин. 10 тренировок) ────────
     balance_date = None
     if total_workouts >= 10:
@@ -1680,7 +1597,6 @@ def get_achievements():
         {"id": "locomotive",      "icon": "🚂",  "name": "Локомотив",            "desc": "100 000 кг суммарного тоннажа",            "earned": bool(loco_date),          "date": loco_date},
         {"id": "atlas",           "icon": "🌍",  "name": "Атлант",               "desc": "1 000 000 кг суммарного тоннажа",          "earned": bool(atlas_date),         "date": atlas_date},
         # Здоровье и тело
-        {"id": "regime",          "icon": "😴",  "name": "Режим",                "desc": "Самочувствие 7 дней подряд",               "earned": bool(regime_date),        "date": regime_date},
         {"id": "weight_tracker",  "icon": "⚖️", "name": "Контроль веса",         "desc": "Первая запись веса тела",                  "earned": bool(bw_first),           "date": bw_first},
         {"id": "discipline",      "icon": "⚖️", "name": "Дисциплина",            "desc": "30 записей веса тела",                     "earned": bool(disc_date),          "date": disc_date},
         {"id": "meas_tracker",    "icon": "📏",  "name": "Замеры тела",          "desc": "Первые замеры тела",                       "earned": bool(meas_first),         "date": meas_first},
@@ -1716,7 +1632,6 @@ def delete_account():
         conn.close()
         return jsonify({"status": "error", "message": "Нельзя удалить единственного администратора"}), 400
     conn.execute("DELETE FROM workout_log WHERE user_id=?", (uid,))
-    conn.execute("DELETE FROM recovery_log WHERE user_id=?", (uid,))
     conn.execute("DELETE FROM body_weight WHERE user_id=?", (uid,))
     conn.execute("DELETE FROM body_measurements WHERE user_id=?", (uid,))
     conn.execute("DELETE FROM exercises WHERE user_id=?", (uid,))
@@ -1929,3 +1844,7 @@ def handle_exception(e):
         return e
     send_telegram(f"🔴 <b>Progressor Exception</b>\n{type(e).__name__}: {str(e)}")
     return jsonify({"status": "error", "message": str(e)}), 500
+
+
+if __name__ == "__main__":
+    app.run(debug=True)

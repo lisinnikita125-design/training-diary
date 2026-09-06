@@ -70,39 +70,8 @@ def init_db():
         )
     """)
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS recovery_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            log_date TEXT NOT NULL,
-            sleep INTEGER,
-            energy INTEGER,
-            stress INTEGER,
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    """)
-
     cur.execute("CREATE INDEX IF NOT EXISTS idx_workout_user_date ON workout_log(user_id, workout_date)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_workout_exercise ON workout_log(exercise_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_recovery_user ON recovery_log(user_id)")
-
-    # Фикс #1: удаляем старый уникальный индекс на одном log_date (без user_id),
-    # который вызывает IntegrityError при нескольких пользователях с одной датой.
-    try:
-        indexes = cur.execute("PRAGMA index_list('recovery_log')").fetchall()
-        for idx in indexes:
-            idx_name = idx[1]
-            idx_unique = idx[2]
-            idx_info = cur.execute(f"PRAGMA index_info('{idx_name}')").fetchall()
-            cols = [i[2] for i in idx_info]
-            if idx_unique and cols == ["log_date"]:
-                cur.execute(f"DROP INDEX IF EXISTS \"{idx_name}\"")
-    except Exception:
-        pass
-
-    cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_recovery_user_date ON recovery_log(user_id, log_date)")
 
     # ── Миграции ────────────────────────────────────────────────
 
@@ -159,11 +128,6 @@ def init_db():
 
     try:
         cur.execute("ALTER TABLE workout_log ADD COLUMN user_id INTEGER REFERENCES users(id)")
-    except Exception:
-        pass
-
-    try:
-        cur.execute("ALTER TABLE recovery_log ADD COLUMN user_id INTEGER REFERENCES users(id)")
     except Exception:
         pass
 

@@ -492,12 +492,6 @@
                 </div>
             </div>
 
-            <!-- Recovery история -->
-            <div style="margin-top:20px;" id="recoverySection">
-                <div style="font-size:15px;font-weight:600;color:var(--text2);margin-bottom:8px;">🩺 История самочувствия</div>
-                <div id="recoveryGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;"></div>
-            </div>
-
             <div id="trainingCalendar" style="margin-top:16px;">
                 <div style="font-size:15px;font-weight:600;color:var(--text2);margin-bottom:8px;">Последние 4 недели</div>
                 <div id="calendarGrid" style="display:grid;grid-template-columns:repeat(28,1fr);gap:3px;"></div>
@@ -613,13 +607,6 @@ async function loadDemoData() {
     } catch(e) {
         showToast('Ошибка', true);
     }
-}
-
-function hideWelcome() {
-    const ws = document.getElementById('welcomeScreen');
-    ws.style.transition = 'opacity 0.3s ease';
-    ws.style.opacity = '0';
-    setTimeout(() => { ws.style.display = 'none'; }, 300);
 }
 
 // ══════════════════════════════════════════════
@@ -1045,21 +1032,6 @@ function playBeep() {
 // ══════════════════════════════════════════════
 //  ЗАГРУЗКА ДНЯ
 // ══════════════════════════════════════════════
-
-// ══════════════════════════════════════════════
-//  ИКОНКИ ГРУПП МЫШЦ
-// ══════════════════════════════════════════════
-function getMuscleIcon(name) {
-    const n = name.toLowerCase();
-    if (n.includes('пресс') || n.includes('косые')) return '🫁';
-    if (n.includes('нога') || n.includes('ног') || n.includes('разгибание') || n.includes('сгибание ног') || n.includes('приводящая') || n.includes('отводящая')) return '🦵';
-    if (n.includes('грудь') || n.includes('грудью')) return '🫀';
-    if (n.includes('плеч') || n.includes('дельт')) return '💪';
-    if (n.includes('спина') || n.includes('блок') || n.includes('тяга') || n.includes('гиперэкстен')) return '🔙';
-    if (n.includes('бицепс') || n.includes('сгибание рук')) return '💪';
-    if (n.includes('трицепс') || n.includes('разгибание на')) return '💪';
-    return '🏋️';
-}
 
 
 async function repeatLastWorkout() {
@@ -1689,40 +1661,6 @@ function showPRBanner(prs) {
     }, 5000);
 }
 
-// ══════════════════════════════════════════════
-//  RECOVERY ИСТОРИЯ
-// ══════════════════════════════════════════════
-async function loadRecoveryHistory() {
-    try {
-        const resp = await fetch('/recovery-history');
-        const data = await resp.json();
-        const grid = document.getElementById('recoveryGrid');
-        if (!grid || !data.history.length) {
-            if (grid) grid.innerHTML = '<div style="color:var(--text2);font-size:15px;">Данных пока нет.</div>';
-            return;
-        }
-        grid.innerHTML = '';
-        data.history.slice(0, 12).forEach(r => {
-            const sleepEmoji = r.sleep >= 4 ? '😴' : r.sleep >= 3 ? '🙂' : '😵';
-            const energyEmoji = r.energy >= 4 ? '⚡' : r.energy >= 3 ? '🔋' : '🪫';
-            const stressEmoji = r.stress <= 2 ? '😌' : r.stress <= 3 ? '😐' : '😰';
-            const card = document.createElement('div');
-            card.style.cssText = 'background:var(--gl);border-radius:8px;padding:8px 10px;';
-            card.innerHTML = `
-                <div style="font-size:15px;color:var(--text2);margin-bottom:4px;">${r.log_date}</div>
-                <div style="font-size:16px;letter-spacing:2px;">${sleepEmoji}${energyEmoji}${stressEmoji}</div>
-                <div style="font-size:15px;color:var(--text2);margin-top:2px;">
-                    ${r.sleep ? 'Сон: ' + r.sleep : ''}
-                    ${r.energy ? ' · Энергия: ' + r.energy : ''}
-                    ${r.stress ? ' · Стресс: ' + r.stress : ''}
-                </div>
-                ${r.tonnage ? '<div style="font-size:15px;color:var(--green);font-weight:600;margin-top:2px;">Тоннаж: ' + Math.round(r.tonnage) + ' кг</div>' : ''}
-            `;
-            grid.appendChild(card);
-        });
-    } catch(e) {}
-}
-
 let bodyWeightChartInstance = null;
 
 async function saveBodyWeight() {
@@ -1879,29 +1817,6 @@ function drawMeasChart(field) {
     });
 }
 
-async function loadAchievements() {
-    try {
-        const data = await fetch('/achievements').then(r => r.json());
-        if (data.status !== 'ok') return;
-        document.getElementById('badgesScore').textContent = 'Progress Score: ' + data.score + '/100';
-        const list = document.getElementById('badgesList');
-        list.innerHTML = data.badges.map(b => {
-            const earned = b.earned;
-            const dateStr = b.date ? b.date.slice(0,10) : '';
-            return `<div onclick="showBadgeDetail('${b.name}','${b.desc}','${dateStr}',${earned})" style="
-                background:${earned ? 'var(--card)' : 'var(--gl)'};
-                border:1.5px solid ${earned ? 'var(--green)' : 'var(--border)'};
-                border-radius:12px;padding:10px 6px;text-align:center;cursor:pointer;
-                box-shadow:${earned ? '0 0 8px rgba(46,204,113,0.3)' : 'none'};
-                opacity:${earned ? '1' : '0.45'};
-                transition:all .2s;">
-                <div style="font-size:24px;margin-bottom:4px;">${b.icon}</div>
-                <div style="font-size:15px;font-weight:600;color:${earned ? 'var(--text)' : 'var(--text2)'};">${b.name}</div>
-            </div>`;
-        }).join('');
-    } catch(e) {}
-}
-
 function showBadgeDetail(name, desc, date, earned) {
     const status = earned ? ('✅ Получено' + (date ? ' · ' + date : '')) : '🔒 Не получено';
     showToast(name + ': ' + desc + ' — ' + status);
@@ -1914,7 +1829,6 @@ async function loadStats() {
     const data = await (await fetch('/stats-summary')).json();
     checkReminder();
     renderCalendar();
-    loadRecoveryHistory();
     loadBodyWeight();
     loadMeasurements();
     document.getElementById('statTotal').textContent = data.total_workouts;
