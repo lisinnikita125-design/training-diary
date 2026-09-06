@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, abort, session, Response
 from database import get_db, init_db, seed_user
-import os, shutil, csv, io, secrets, json
+import os, shutil, csv, io, secrets, json, html
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -147,6 +147,7 @@ def register():
     seed_user(user_id)
 
     verify_url = f"{APP_URL}/verify-email?token={token}"
+    safe_name = html.escape(name)
     send_email(email, "Подтверди email — Progressor", f"""
     <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;background:#0f1117;border-radius:16px;overflow:hidden;">
         <div style="background:linear-gradient(135deg,#1a3d28,#2ecc71);padding:32px;text-align:center;">
@@ -155,7 +156,7 @@ def register():
             <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:13px;">Train smarter. Recover better.</p>
         </div>
         <div style="padding:32px;background:#1a1d26;">
-            <h2 style="color:#e8eaf0;margin:0 0 16px;font-size:20px;">Привет{', ' + name if name else ''}! 👋</h2>
+            <h2 style="color:#e8eaf0;margin:0 0 16px;font-size:20px;">Привет{', ' + safe_name if safe_name else ''}! 👋</h2>
             <p style="color:#8b92a8;line-height:1.6;margin:0 0 24px;">Ты почти готов начать тренироваться умнее. Подтверди свой email чтобы войти в Progressor.</p>
             <a href="{verify_url}" style="display:block;background:linear-gradient(135deg,#1a8a4a,#2ecc71);color:white;text-decoration:none;padding:14px 24px;border-radius:10px;font-weight:700;font-size:16px;text-align:center;">✅ Подтвердить email</a>
             <p style="color:#8b92a8;font-size:12px;margin:24px 0 0;text-align:center;">Если ты не регистрировался — просто проигнорируй это письмо.</p>
