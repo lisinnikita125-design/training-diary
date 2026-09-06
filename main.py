@@ -796,6 +796,22 @@ def log_workout():
     data = request.get_json()
     if not data:
         abort(400, description="Отсутствуют данные")
+    if not data.get("day_id"):
+        abort(400, description="Поле day_id обязательно")
+    if not data.get("date"):
+        abort(400, description="Поле date обязательно")
+    if not isinstance(data.get("exercises"), list) or not data["exercises"]:
+        abort(400, description="Поле exercises обязательно и должно быть непустым списком")
+    for ex_log in data["exercises"]:
+        if not isinstance(ex_log, dict) or not ex_log.get("exercise_id"):
+            abort(400, description="У каждого упражнения обязателен exercise_id")
+        if not ex_log.get("skipped"):
+            if not isinstance(ex_log.get("sets"), list) or not ex_log["sets"]:
+                abort(400, description=f"Упражнение {ex_log['exercise_id']}: поле sets обязательно и должно быть непустым списком")
+            for s in ex_log["sets"]:
+                if not isinstance(s, dict) or s.get("set_number") is None or s.get("reps") is None:
+                    abort(400, description=f"Упражнение {ex_log['exercise_id']}: у каждого подхода обязательны set_number и reps")
+
     uid = current_user_id()
     conn = get_db()
     cur = conn.cursor()
@@ -991,6 +1007,10 @@ def edit_log():
     data = request.get_json()
     if not data:
         abort(400, description="Нет данных")
+    required = ["exercise_name", "workout_date", "set_number", "weight", "reps"]
+    missing = [f for f in required if data.get(f) is None]
+    if missing:
+        abort(400, description=f"Отсутствуют обязательные поля: {', '.join(missing)}")
     uid = current_user_id()
     conn = get_db()
     cur = conn.cursor()
@@ -1916,6 +1936,14 @@ def workout_history():
 
     conn.close()
     return jsonify({"history": result})
+
+@app.errorhandler(400)
+def handle_400(e):
+    return jsonify({"status": "error", "message": e.description or "Некорректный запрос"}), 400
+
+@app.errorhandler(404)
+def handle_404(e):
+    return jsonify({"status": "error", "message": e.description or "Не найдено"}), 404
 
 @app.errorhandler(401)
 def handle_401(e):
