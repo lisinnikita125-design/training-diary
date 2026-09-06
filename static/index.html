@@ -99,6 +99,8 @@
         .ex-header .ex-name { font-size:16px; font-weight:600; color:var(--text); text-align:left; }
         .ex-weight { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:34px; font-weight:700; color:var(--text); white-space:nowrap; }
         .ex-weight .ex-weight-unit { font-family:'Inter',sans-serif; font-size:15px; font-weight:600; color:var(--text2); letter-spacing:0; margin-left:4px; }
+        .ex-weight-num { cursor:pointer; }
+        .ex-weight-input { font-family:var(--font-num); font-variant-numeric:tabular-nums; font-size:34px; font-weight:700; color:var(--text); width:100px; text-align:left; border:1.5px solid var(--green); border-radius:6px; background:var(--card); -webkit-appearance:none; }
         .set-row { display:flex; align-items:center; gap:14px; min-height:52px; padding:6px 2px; cursor:pointer; }
         .set-check { flex-shrink:0; width:26px; height:26px; border-radius:50%; border:2px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:14px; color:transparent; }
         .set-row.done .set-check { background:var(--green); border-color:var(--green); color:#fff; }
@@ -1262,7 +1264,7 @@ async function loadDay() {
         block.innerHTML = `
             <div class="ex-header">
                 <div class="ex-name">${ex.name}</div>
-                <div class="ex-weight">${targetWeight}<span class="ex-weight-unit">кг</span></div>
+                <div class="ex-weight"><span class="ex-weight-num" onclick="editHeaderWeight(${ex.id}, this)">${targetWeight}</span><span class="ex-weight-unit">кг</span></div>
             </div>
             ${setsHtml}
             <input type="text" class="difficulty-input" placeholder="Легко/Тяжело" oninput="saveTableState()">
@@ -1407,6 +1409,38 @@ function editSetValue(exId, idx, field, el) {
     const commit = () => {
         exerciseSets[exId][idx][field] = parseFloat(input.value) || 0;
         renderSetRowInto(exId, idx);
+        updateTotalTonnage();
+        saveTableState();
+    };
+    input.onblur = commit;
+    input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); };
+    input.onclick = (e) => e.stopPropagation();
+    el.textContent = '';
+    el.appendChild(input);
+    input.focus();
+    input.select();
+}
+
+function editHeaderWeight(exId, el) {
+    const block = document.querySelector(`.ex-block[data-exercise-id="${exId}"]`);
+    if (block && block.dataset.skipped) return;
+    if (el.querySelector('input')) return;
+    const current = parseFloat(el.textContent) || 0;
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'ex-weight-input';
+    input.value = current;
+    input.min = '0';
+    input.step = '0.5';
+    input.inputMode = 'decimal';
+    const commit = () => {
+        const val = parseFloat(input.value) || 0;
+        el.textContent = val;
+        exerciseSets[exId].forEach((s, i) => {
+            if (s.done) return; // выполненные подходы не трогаем
+            s.weight = val;
+            renderSetRowInto(exId, i);
+        });
         updateTotalTonnage();
         saveTableState();
     };
