@@ -142,6 +142,12 @@ def init_db():
     except Exception:
         pass
 
+    # day_templates: active — архивация дня (не удаляем, чтобы не терять историю)
+    try:
+        cur.execute("ALTER TABLE day_templates ADD COLUMN active INTEGER DEFAULT 1")
+    except Exception:
+        pass
+
     # day_visibility: кастомный список пользователей, которым доступен день (visibility='custom')
     cur.execute("""
         CREATE TABLE IF NOT EXISTS day_visibility (
