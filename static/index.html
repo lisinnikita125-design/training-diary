@@ -16,7 +16,7 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <title>Progressor — AI-тренер</title>
+    <title>Progressor</title>
     <style>
         * { box-sizing: border-box; }
         :root {
@@ -316,8 +316,6 @@
           <button class="nav-tab" onclick="showTab('progress')">📈</button>
         <button class="nav-tab" onclick="showTab('compare')">⚖️</button>
         <button class="nav-tab" onclick="showTab('stats')">📊</button>
-        <button class="nav-tab" onclick="showTab('ai')">🤖</button>
-        <button class="nav-tab" onclick="showTab('myprogress')">🏆</button>
     </div>
 
     <!-- ═══ ТРЕНИРОВКА ═══ -->
@@ -509,112 +507,6 @@
                 </div>
             </div>
 <canvas id="weeklyChart" height="160" style="margin-top:20px;"></canvas>
-        </div>
-    </div>
-    <!-- ═══ AI ТРЕНЕР ═══ -->
-    <div id="tab-ai" class="hidden">
-        <div class="section">
-            <h2>🤖 AI-тренер</h2>
-            <p style="font-size:15px;color:var(--text2);margin:0 0 12px 0;">
-                Анализирует последнюю тренировку, сравнивает с предыдущей и даёт план на следующую.
-            </p>
-
-            <!-- Показатели восстановления -->
-            <div style="background:var(--gl);border-radius:10px;padding:12px;margin-bottom:12px;">
-                <div style="font-size:15px;font-weight:600;color:var(--text2);margin-bottom:10px;">🩺 Самочувствие сейчас (необязательно)</div>
-                <div style="display:flex;flex-direction:column;gap:8px;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                        <span style="font-size:15px;color:var(--text2);min-width:90px;">😴 Сон</span>
-                        <select id="recSleep" style="flex:1;font-size:15px;padding:6px 8px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;">
-                            <option value="">—</option>
-                            <option value="1">1 — плохо</option>
-                            <option value="2">2</option>
-                            <option value="3">3 — норм</option>
-                            <option value="4">4</option>
-                            <option value="5">5 — отлично</option>
-                        </select>
-                    </div>
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                        <span style="font-size:15px;color:var(--text2);min-width:90px;">⚡ Энергия</span>
-                        <select id="recEnergy" style="flex:1;font-size:15px;padding:6px 8px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;">
-                            <option value="">—</option>
-                            <option value="1">1 — нет сил</option>
-                            <option value="2">2</option>
-                            <option value="3">3 — норм</option>
-                            <option value="4">4</option>
-                            <option value="5">5 — бодр</option>
-                        </select>
-                    </div>
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                        <span style="font-size:15px;color:var(--text2);min-width:90px;">😰 Стресс</span>
-                        <select id="recStress" style="flex:1;font-size:15px;padding:6px 8px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:8px;">
-                            <option value="">—</option>
-                            <option value="1">1 — нет</option>
-                            <option value="2">2</option>
-                            <option value="3">3 — норм</option>
-                            <option value="4">4</option>
-                            <option value="5">5 — высокий</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <button class="btn-primary" style="width:100%;" onclick="runAnalysis()">🔍 Анализ + план на следующую тренировку</button>
-
-            <div id="aiLoading" class="hidden" style="text-align:center;padding:24px;color:var(--text2);">
-                <div style="font-size:28px;margin-bottom:8px;">⏳</div>
-                <div>Анализирую тренировки...</div>
-            </div>
-
-            <div id="aiResult" class="hidden" style="background:var(--gl);border-radius:10px;padding:16px;margin-top:12px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                    <span style="font-weight:700;color:var(--green);font-size:15px;">📊 Анализ тренировок</span>
-                    <button class="theme-toggle" onclick="copyAnalysis()">📋 Копировать</button>
-                </div>
-                <div id="aiResultText" style="font-size:15px;line-height:1.7;color:var(--text);"></div>
-            </div>
-        </div>
-
-            <!-- История AI анализов -->
-            <div style="margin-top:16px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="font-size:15px;font-weight:600;color:var(--text2);">📜 История анализов</span>
-                    <button class="btn-secondary btn-sm" onclick="loadAIHistory()">Обновить</button>
-                </div>
-                <div id="aiHistoryList" style="display:flex;flex-direction:column;gap:8px;">
-                    <div style="text-align:center;color:var(--text2);font-size:15px;padding:12px;">Нажми «Обновить» чтобы загрузить</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ═══ МОЙ ПРОГРЕСС ═══ -->
-    <div id="tab-myprogress" class="hidden">
-        <div class="section">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-                <h2 style="margin:0;">🏆 Мой прогресс</h2>
-                
-            </div>
-
-            <div style="margin-bottom:16px"><button id="ai-trigger-btn" onclick="triggerAiAnalysis()" class="btn-primary" style="width:100%;padding:14px;font-size:16px;">🤖 Запустить AI-анализ</button></div>
-            <p style="font-size:15px;color:var(--text2);margin:0 0 16px 0;">AI-сводка прогресса за последние 8 недель на основе тренировок, веса тела и замеров.</p>
-
-            <div id="progressLoading" class="hidden" style="text-align:center;padding:24px;color:var(--text2);">
-                <div style="font-size:28px;margin-bottom:8px;">⏳</div>
-                <div>Анализирую прогресс...</div>
-            </div>
-
-            <div id="progressResult" class="hidden">
-                <div id="progressResultText" style="font-size:15px;line-height:1.7;color:var(--text);"></div>
-            </div>
-    <h3 style="margin-top:24px">📋 История анализов</h3>
-    <div id="ai-history-list"></div>
-
-            <div id="progressEmpty" style="text-align:center;padding:32px;color:var(--text2);">
-                <div style="font-size:48px;margin-bottom:12px;">📈</div>
-                <div style="font-size:15px;font-weight:600;margin-bottom:8px;">Начни отслеживать прогресс</div>
-                <div style="font-size:15px;">Проведи несколько тренировок, добавь вес тела и замеры — AI покажет твой прогресс за 8 недель.</div>
-            </div>
         </div>
     </div>
         <!-- ═══ ДОСТИЖЕНИЯ ═══ -->
@@ -1051,16 +943,15 @@ function toggleHistory(idx) {
 function showTab(name) {
   if (name === 'achievements') { loadAchievementsTab(); }
     document.getElementById('settingsMenu').classList.add('hidden');
-    ['workout','history','progress','compare','stats','ai','myprogress','achievements'].forEach(t => {
+    ['workout','history','progress','compare','stats','achievements'].forEach(t => {
         document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
     });
     document.querySelectorAll('.nav-tab').forEach((btn, i) => {
-        btn.classList.toggle('active', ['workout','history','achievements','progress','compare','stats','ai','myprogress'][i] === name);
+        btn.classList.toggle('active', ['workout','history','achievements','progress','compare','stats'][i] === name);
     });
     if (name === 'stats') loadStats();
     if (name === 'compare') loadCompareDates();
     if (name === 'history') loadWorkoutHistory();
-    if (name === 'myprogress') loadAiHistory();
 }
 
 // ══════════════════════════════════════════════
@@ -1433,7 +1324,6 @@ async function saveWorkout() {
                     showToast('✅ Сохранено!' + (duration ? ' Время: ' + duration : ''));
                     clearTableState();
                     checkPR(date);
-                    setTimeout(() => showAIPrompt(), 2000);
             document.querySelectorAll('#exercisesBody tr').forEach(row => {
                 row.querySelectorAll('.set-input').forEach(i => i.value='');
                 const d = row.querySelector('.difficulty-input'); if(d) d.value='';
@@ -1765,27 +1655,6 @@ function stopWorkoutTimer() {
 // ══════════════════════════════════════════════
 //  PR-СИСТЕМА
 // ══════════════════════════════════════════════
-function dismissAIPrompt() { const b = document.getElementById("aiPromptBanner"); if (b) b.remove(); }
-
-function showAIPrompt() {
-    const banner = document.createElement('div');
-    banner.id = 'aiPromptBanner';
-    banner.style.cssText = 'position:fixed;bottom:80px;left:12px;right:12px;background:var(--card);border:1.5px solid var(--green);border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;z-index:300;box-shadow:0 4px 16px rgba(0,0,0,0.3);';
-    banner.innerHTML = '<span style="font-size:15px;color:var(--text);">🤖 Получить AI анализ тренировки?</span><div style="display:flex;gap:8px;"><button onclick="runAIAnalysis()" style="background:var(--green);color:white;border:none;border-radius:8px;padding:6px 12px;font-size:15px;font-weight:600;cursor:pointer;">Да</button><button onclick="dismissAIPrompt()" style="background:var(--gl);color:var(--text2);border:none;border-radius:8px;padding:6px 10px;font-size:15px;cursor:pointer;">✕</button></div>';
-    document.body.appendChild(banner);
-    setTimeout(() => { const b = document.getElementById('aiPromptBanner'); if (b) b.remove(); }, 8000);
-}
-
-async function runAIAnalysis() {
-    const b = document.getElementById('aiPromptBanner');
-    if (b) b.remove();
-    showTab('ai');
-    const exName = document.getElementById('exerciseSelect')?.value;
-    if (!exName) { showToast('Выбери упражнение для анализа', true); return; }
-    const btn = document.querySelector('#tab-ai .btn-primary');
-    if (btn) btn.click();
-}
-
 async function checkPR(date) {
     try {
         const resp = await fetch('/check-pr', {
@@ -1829,7 +1698,7 @@ async function loadRecoveryHistory() {
         const data = await resp.json();
         const grid = document.getElementById('recoveryGrid');
         if (!grid || !data.history.length) {
-            if (grid) grid.innerHTML = '<div style="color:var(--text2);font-size:15px;">Данных пока нет — заполняй самочувствие в AI-тренере перед анализом.</div>';
+            if (grid) grid.innerHTML = '<div style="color:var(--text2);font-size:15px;">Данных пока нет.</div>';
             return;
         }
         grid.innerHTML = '';
@@ -1852,137 +1721,6 @@ async function loadRecoveryHistory() {
             grid.appendChild(card);
         });
     } catch(e) {}
-}
-
-// ══════════════════════════════════════════════
-//  AI-ТРЕНЕР
-// ══════════════════════════════════════════════
-function renderAIText(text) {
-    let html = text;
-
-    // Жирный **текст**
-    html = html.replace(/[*][*]([^*]+)[*][*]/g, '<strong>$1</strong>');
-
-    // Таблицы — ищем строки с |
-    const lines = html.split('<br>').join('\n').split('\n');
-    let result = [];
-    let i = 0;
-    while (i < lines.length) {
-        const line = lines[i];
-        if (line.trim().startsWith('|') && i + 1 < lines.length && lines[i+1].replace(/[-|: ]/g,'').trim() === '') {
-            // Это таблица
-            const headerCells = line.split('|').map(c => c.trim()).filter(Boolean);
-            let t = '<div style="overflow-x:auto;margin:10px 0;"><table style="width:100%;border-collapse:collapse;font-size:15px;">';
-            t += '<thead><tr>' + headerCells.map(h => '<th style="background:#e31e24;color:white;padding:8px 10px;text-align:left;white-space:nowrap;">' + h + '</th>').join('') + '</tr></thead><tbody>';
-            i += 2; // пропускаем заголовок и разделитель
-            let rowIdx = 0;
-            while (i < lines.length && lines[i].trim().startsWith('|')) {
-                const cells = lines[i].split('|').map(c => c.trim()).filter(Boolean);
-                const bg = rowIdx % 2 === 0 ? 'var(--card)' : 'var(--gl)';
-                t += '<tr style="background:' + bg + ';">' + cells.map(c => '<td style="padding:7px 10px;border-bottom:1px solid var(--border);">' + c + '</td>').join('') + '</tr>';
-                i++;
-                rowIdx++;
-            }
-            t += '</tbody></table></div>';
-            result.push(t);
-        } else if (line.trim().startsWith('- ') || line.trim().startsWith('- ')) {
-            const txt = line.trim().substring(2);
-            result.push('<div style="display:flex;gap:8px;margin:4px 0;"><span style="color:#e31e24;font-weight:700;flex-shrink:0;">•</span><span>' + txt + '</span></div>');
-            i++;
-        } else {
-            result.push(line);
-            i++;
-        }
-    }
-    return result.join('<br>');
-}
-
-async function runAnalysis() {
-    const loading = document.getElementById('aiLoading');
-    const result = document.getElementById('aiResult');
-    const resultText = document.getElementById('aiResultText');
-
-    loading.classList.remove('hidden');
-    result.classList.add('hidden');
-
-    const sleep = document.getElementById('recSleep').value || null;
-    const energy = document.getElementById('recEnergy').value || null;
-    const stress = document.getElementById('recStress').value || null;
-
-    // Сохраняем recovery если заполнено
-    if (sleep || energy || stress) {
-        const today = new Date().toISOString().split('T')[0];
-        fetch('/recovery', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({date: today, sleep: parseInt(sleep)||null, energy: parseInt(energy)||null, stress: parseInt(stress)||null})
-        }).catch(() => {});
-    }
-
-    try {
-        const resp = await fetch('/ai-analyze', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({sleep, energy, stress})
-        });
-        const data = await resp.json();
-        loading.classList.add('hidden');
-
-        if (data.status === 'ok') {
-            resultText.innerHTML = renderAIText(data.analysis);
-            result.classList.remove('hidden');
-        } else {
-            showToast('Ошибка AI: ' + (data.message || 'неизвестная'), true);
-        }
-    } catch(e) {
-        loading.classList.add('hidden');
-        showToast('Ошибка соединения с AI', true);
-    }
-}
-
-async function loadAIHistory() {
-    const container = document.getElementById('aiHistoryList');
-    container.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:15px;padding:12px;">Загрузка...</div>';
-    try {
-        const data = await fetch('/ai-workout-history').then(r => r.json());
-        if (!data.history || data.history.length === 0) {
-            container.innerHTML = '<div style="text-align:center;color:var(--text2);font-size:15px;padding:12px;">История пуста — запусти анализ после тренировки</div>';
-            return;
-        }
-        container.innerHTML = data.history.map((rec, idx) => {
-            const text = rec.recommendation_text || '';
-            // Извлекаем индекс готовности
-            const readinessMatch = text.match(/готовность (\d+(?:\.\d+)?\/10)/i);
-            const readiness = readinessMatch ? readinessMatch[1] : null;
-            // Извлекаем вердикт
-            const verdictMatch = text.match(/Вердикт[: ]+([^.]+)/i);
-            const verdict = verdictMatch ? verdictMatch[1].trim() : null;
-            // Цвет индекса
-            const score = readiness ? parseFloat(readiness) : 0;
-            const color = score >= 8 ? '#2ecc71' : score >= 6 ? '#f39c12' : '#e74c3c';
-
-            return `<div style="background:var(--card);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:8px;">
-                <div onclick="toggleAIHistory(${idx})" style="padding:12px 16px;cursor:pointer;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                        <div style="font-weight:700;font-size:15px;color:var(--text)">📅 ${rec.workout_date}</div>
-                        ${readiness ? `<div style="background:${color};color:white;border-radius:20px;padding:3px 10px;font-size:15px;font-weight:700;">⚡ ${readiness}</div>` : ''}
-                    </div>
-                    <div style="font-size:15px;color:var(--text2);margin-bottom:4px;">${rec.created_at ? rec.created_at.slice(0,16) : ''}</div>
-                    ${verdict ? `<div style="font-size:15px;color:var(--text2);font-style:italic;">🎯 ${verdict}</div>` : ''}
-                </div>
-                <div id="ai-hist-${idx}" class="hidden" style="border-top:1px solid var(--border);padding:14px;">
-                    <div style="font-size:15px;line-height:1.8;color:var(--text);">${renderAIText(text)}</div>
-                </div>
-            </div>`;
-        }).join('');
-    } catch(e) {
-        container.innerHTML = '<div style="text-align:center;color:#c62828;font-size:15px;padding:12px;">Ошибка загрузки</div>';
-    }
-}
-
-function toggleAIHistory(idx) {
-    const el = document.getElementById('ai-hist-' + idx);
-    if (el) el.classList.toggle('hidden');
 }
 
 let bodyWeightChartInstance = null;
@@ -2167,39 +1905,6 @@ async function loadAchievements() {
 function showBadgeDetail(name, desc, date, earned) {
     const status = earned ? ('✅ Получено' + (date ? ' · ' + date : '')) : '🔒 Не получено';
     showToast(name + ': ' + desc + ' — ' + status);
-}
-
-async function loadProgressSummary() {
-    const loading = document.getElementById('progressLoading');
-    const result = document.getElementById('progressResult');
-    const empty = document.getElementById('progressEmpty');
-    const text = document.getElementById('progressResultText');
-
-    loading.classList.remove('hidden');
-    result.classList.add('hidden');
-    empty.classList.add('hidden');
-
-    try {
-        const resp = await fetch('/progress-summary');
-        const data = await resp.json();
-        loading.classList.add('hidden');
-
-        if (data.status === 'ok') {
-            text.innerHTML = renderAIText(data.summary);
-            result.classList.remove('hidden');
-            if (!document.getElementById('progressSummaryLoaded')) { const m = document.createElement('span'); m.id = 'progressSummaryLoaded'; m.style.display = 'none'; document.body.appendChild(m); }
-        } else {
-            empty.classList.remove('hidden');
-        }
-    } catch(e) {
-        loading.classList.add('hidden');
-        empty.classList.remove('hidden');
-    }
-}
-
-function copyAnalysis() {
-    const text = document.getElementById('aiResultText').textContent;
-    navigator.clipboard.writeText(text).then(() => showToast('✅ Скопировано'));
 }
 
 // ══════════════════════════════════════════════
@@ -2427,59 +2132,6 @@ async function loadAchievementsTab() {
   }
 }
 
-// ── AI-анализ по кнопке ─────────────────────────────────────────────────────
-async function triggerAiAnalysis() {
-  const btn = document.getElementById('ai-trigger-btn');
-  const loading = document.getElementById('progressLoading');
-  const result  = document.getElementById('progressResult');
-  const textEl  = document.getElementById('progressResultText');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Анализирую...'; }
-  if (loading) loading.classList.remove('hidden');
-  if (result)  result.classList.add('hidden');
-  try {
-    const r = await fetch('/progress-summary');
-    const d = await r.json();
-    if (d.status === 'ok') {
-      const text = d.analysis || d.summary || '';
-      if (textEl) textEl.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text.replace(/\n/g,'<br>');
-      if (result) result.classList.remove('hidden');
-      await loadAiHistory();
-    } else {
-      showToast(d.message || 'Ошибка AI', true);
-    }
-  } catch(e) {
-    showToast('Ошибка соединения', true);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🤖 Запустить AI-анализ'; }
-    if (loading) loading.classList.add('hidden');
-  }
-}
-
-// ── История AI-анализов ─────────────────────────────────────────────────────
-async function loadAiHistory() {
-  const listEl = document.getElementById('ai-history-list');
-  if (!listEl) return;
-  try {
-    const r = await fetch('/ai-history');
-    const d = await r.json();
-    if (d.status !== 'ok' || !d.history.length) {
-      listEl.innerHTML = '<p style="color:var(--muted);font-size:15px">История анализов пуста</p>';
-      return;
-    }
-    listEl.innerHTML = d.history.map((h, i) => `
-      <details style="background:var(--card-bg);border:1px solid var(--border);border-radius:10px;overflow:hidden" ${i===0?'open':''}>
-        <summary style="padding:12px 16px;cursor:pointer;font-weight:600;font-size:15px;list-style:none;display:flex;justify-content:space-between">
-          <span>📊 ${h.date}</span>
-          <span style="font-size:15px;color:var(--muted);font-weight:400">${i===0?'последний':''}</span>
-        </summary>
-        <div style="padding:0 16px 14px;font-size:15px;line-height:1.6;color:var(--text)">
-          ${typeof marked !== 'undefined' ? marked.parse(h.text) : h.text.replace(/\n/g,'<br>')}
-        </div>
-      </details>`).join('');
-  } catch(e) {
-    listEl.innerHTML = '<p style="color:var(--muted);font-size:15px">Ошибка загрузки истории</p>';
-  }
-}
 // ── Хук на переключение вкладок ────────────────────────────────────────────
 </script>
 <div id="profileModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;padding:20px;">
