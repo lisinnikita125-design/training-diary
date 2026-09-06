@@ -1,4 +1,4 @@
-const CACHE_NAME = 'training-diary-v2';
+const CACHE_NAME = 'training-diary-v3';
 const STATIC_ASSETS = [
     '/static/index.html',
     'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
@@ -24,7 +24,8 @@ self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
 
     // API запросы — только сеть
-    if (url.pathname.startsWith('/day/') || url.pathname.startsWith('/log') ||
+    if (url.pathname === '/days' || url.pathname.startsWith('/days/') ||
+        url.pathname.startsWith('/day/') || url.pathname.startsWith('/log') ||
         url.pathname.startsWith('/progress') || url.pathname.startsWith('/stats') ||
         url.pathname.startsWith('/ai-') || url.pathname.startsWith('/recovery') ||
         url.pathname.startsWith('/check') || url.pathname.startsWith('/last-weight') ||

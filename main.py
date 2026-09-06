@@ -564,7 +564,7 @@ def get_days():
     uid = current_user_id()
     conn = get_db()
     days = conn.execute("""
-        SELECT DISTINCT d.id, d.name, d.sort_order
+        SELECT DISTINCT d.id, d.name, d.sort_order, d.active
         FROM day_templates d
         LEFT JOIN day_visibility dv ON dv.day_id = d.id AND dv.user_id = ?
         WHERE d.visibility = 'all'
@@ -769,6 +769,22 @@ def update_day(day_id):
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
+
+
+@app.route("/days/<int:day_id>/toggle-active", methods=["POST"])
+def toggle_day_active(day_id):
+    require_admin()
+    conn = get_db()
+    cur = conn.cursor()
+    day = cur.execute("SELECT active FROM day_templates WHERE id=?", (day_id,)).fetchone()
+    if not day:
+        conn.close()
+        abort(404, description="День не найден")
+    new_active = 0 if day["active"] else 1
+    cur.execute("UPDATE day_templates SET active=? WHERE id=?", (new_active, day_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "ok", "active": new_active})
 
 
 @app.route("/days/<int:day_id>/details", methods=["GET"])

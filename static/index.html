@@ -909,10 +909,10 @@ async function loadWorkoutSummary() {
 
     try {
         const [days, datesData] = await Promise.all([
-            fetch('/days').then(r => r.json()),
+            fetch('/days', {cache: 'no-store'}).then(r => r.json()),
             fetch('/workout-dates').then(r => r.json())
         ]);
-        wsTarget = pickTargetDay(days, datesData.by_day || {});
+        wsTarget = pickTargetDay(days.filter(d => d.active), datesData.by_day || {});
         if (!wsTarget) { box.classList.add('hidden'); return; }
         box.classList.remove('hidden');
 
@@ -2261,6 +2261,7 @@ async function loadAchievementsTab() {
         <div style="display:flex;gap:8px;align-items:center;">
             <select id="dmDaySelect" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;"></select>
             <button id="dmEditDayBtn" onclick="dmEditDay()" style="display:none;padding:10px 12px;background:none;border:1.5px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:15px;white-space:nowrap;">✏️</button>
+            <button id="dmArchiveDayBtn" onclick="dmToggleArchive()" style="display:none;padding:10px 12px;background:none;border:1.5px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:15px;white-space:nowrap;">🗄️</button>
             <button id="dmDeleteDayBtn" onclick="dmDeleteDay()" style="display:none;padding:10px 12px;background:none;border:1.5px solid #c62828;border-radius:8px;color:#c62828;cursor:pointer;font-size:15px;white-space:nowrap;">🗑</button>
         </div>
         <input id="dmExName" placeholder="Название упражнения" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
@@ -2319,18 +2320,23 @@ function dmToggleVisibilityUsers() {
     ).join('') || '<span style="font-size:13px;color:var(--text2)">Нет других пользователей</span>';
 }
 
+let dmDaysList = [];
+
 async function dmRefreshDays() {
     const sel = document.getElementById('dmDaySelect');
     const mainSel = document.getElementById('daySelect');
-    const resp = await fetch('/days');
+    const resp = await fetch('/days', {cache: 'no-store'});
     if (!resp.ok) return;
     const days = await resp.json();
+    dmDaysList = days;
     const prevVal = sel.value;
-    sel.innerHTML = days.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+    sel.innerHTML = days.map(d => `<option value="${d.id}">${d.name}${d.active ? '' : ' (в архиве)'}</option>`).join('');
     if (prevVal && days.some(d => String(d.id) === prevVal)) sel.value = prevVal;
     if (mainSel) {
+        const activeIds = new Set(days.filter(d => d.active).map(d => String(d.id)));
+        Array.from(mainSel.options).forEach(o => { if (!activeIds.has(o.value)) o.remove(); });
         const existing = new Set(Array.from(mainSel.options).map(o => o.value));
-        days.forEach(d => {
+        days.filter(d => d.active).forEach(d => {
             if (!existing.has(String(d.id))) {
                 const o = document.createElement('option');
                 o.value = d.id;
@@ -2342,6 +2348,36 @@ async function dmRefreshDays() {
     if (sel.value) dmLoadExercises(sel.value);
     document.getElementById('dmDeleteDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
     document.getElementById('dmEditDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
+    document.getElementById('dmArchiveDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
+    dmUpdateArchiveBtn();
+}
+
+function dmUpdateArchiveBtn() {
+    const btn = document.getElementById('dmArchiveDayBtn');
+    if (!btn) return;
+    const sel = document.getElementById('dmDaySelect');
+    const day = dmDaysList.find(d => String(d.id) === sel.value);
+    if (!day) return;
+    btn.textContent = day.active ? '🗄️' : '↩️';
+    btn.title = day.active ? 'Отправить в архив' : 'Вернуть из архива';
+}
+
+async function dmToggleArchive() {
+    const dayId = document.getElementById('dmDaySelect').value;
+    if (!dayId) return;
+    const msg = document.getElementById('dmMsg');
+    try {
+        const resp = await fetch('/days/' + dayId + '/toggle-active', {method:'POST'});
+        if (!resp.ok) throw new Error();
+        const data = await resp.json();
+        msg.style.color = 'var(--green)';
+        msg.textContent = data.active ? 'День возвращён из архива ✓' : 'День отправлен в архив ✓';
+        await dmRefreshDays();
+        loadWorkoutSummary();
+    } catch(e) {
+        msg.style.color = '#c62828';
+        msg.textContent = 'Не удалось изменить статус дня';
+    }
 }
 
 let dmCurrentExercises = [];
@@ -2383,6 +2419,8 @@ document.addEventListener('change', (e) => {
         dmLoadExercises(e.target.value);
         document.getElementById('dmDeleteDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
         document.getElementById('dmEditDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
+        document.getElementById('dmArchiveDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
+        dmUpdateArchiveBtn();
         dmCancelExerciseEdit();
     }
 });
