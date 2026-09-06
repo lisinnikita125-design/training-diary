@@ -10,21 +10,26 @@ import os
 # ── Читаем секреты из файла config.py ───────────────────
 try:
     import config as _cfg
-    app.secret_key = _cfg.SECRET_KEY
-    MAIL_SERVER   = getattr(_cfg, "MAIL_SERVER",   "smtp.gmail.com")
-    MAIL_PORT     = getattr(_cfg, "MAIL_PORT",     587)
-    MAIL_USER     = getattr(_cfg, "MAIL_USER",     "")
-    MAIL_PASSWORD = getattr(_cfg, "MAIL_PASSWORD", "")
-    MAIL_FROM     = getattr(_cfg, "MAIL_FROM",     MAIL_USER)
-    APP_URL       = getattr(_cfg, "APP_URL",       "https://nikitalisin.pythonanywhere.com")
-except Exception:
-    app.secret_key = "change-this-fallback"
-    MAIL_SERVER = "smtp.gmail.com"
-    MAIL_PORT = 587
-    MAIL_USER = ""
-    MAIL_PASSWORD = ""
-    MAIL_FROM = ""
-    APP_URL = "https://nikitalisin.pythonanywhere.com"
+except ImportError as e:
+    raise RuntimeError(
+        "Не найден config.py. Создайте файл config.py в корне проекта "
+        "с обязательной переменной SECRET_KEY (случайная строка, "
+        "например secrets.token_hex(32)) перед запуском приложения."
+    ) from e
+
+if not getattr(_cfg, "SECRET_KEY", None):
+    raise RuntimeError(
+        "В config.py отсутствует SECRET_KEY. Задайте случайный секрет "
+        "(например secrets.token_hex(32)) перед запуском приложения."
+    )
+
+app.secret_key = _cfg.SECRET_KEY
+MAIL_SERVER   = getattr(_cfg, "MAIL_SERVER",   "smtp.gmail.com")
+MAIL_PORT     = getattr(_cfg, "MAIL_PORT",     587)
+MAIL_USER     = getattr(_cfg, "MAIL_USER",     "")
+MAIL_PASSWORD = getattr(_cfg, "MAIL_PASSWORD", "")
+MAIL_FROM     = getattr(_cfg, "MAIL_FROM",     MAIL_USER)
+APP_URL       = getattr(_cfg, "APP_URL",       "https://nikitalisin.pythonanywhere.com")
 
 init_db()
 
