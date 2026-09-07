@@ -441,11 +441,7 @@
 
         <div class="section">
             <div class="day-controls">
-                <select id="daySelect">
-                    <option value="1">День 1 – ВЕРХ</option>
-                    <option value="2">День 2 – НОГИ + ТАЛИЯ</option>
-                    <option value="3">День 3 – ВЕРХ (плечи, спина)</option>
-                </select>
+                <select id="daySelect"></select>
                 <button class="btn-primary" onclick="loadDayWithRestore()">Загрузить</button>
                 <button class="btn-secondary" onclick="repeatLastWorkout()" title="Заполнить веса и повторения из прошлой тренировки этого дня">🔁 Повторить</button>
             </div>
@@ -711,13 +707,21 @@ function showBox(name) {
     });
 }
 
-function showApp(name) {
+// Общая инициализация после подтверждённой авторизации — используется и при
+// открытии страницы с уже активной сессией (window.onload), и сразу после
+// формы входа (doLogin), чтобы #daySelect и сводка "Сегодня" не расходились
+// в зависимости от того, каким путём пользователь попал в приложение.
+async function initApp() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     const ws = document.getElementById('welcomeScreen');
     if (ws) ws.style.display = 'none';
     fillExerciseSelect();
     checkAdminAccess();
+    await loadWorkoutSummary();
+    const rem = await fetch('/check-reminder').then(r=>r.json()).catch(()=>({}));
+    if (rem.days_since >= 3) maybeNotify(rem.days_since);
+    await restoreActiveWorkoutOnLoad();
 }
 
 async function doLogin() {
@@ -733,7 +737,7 @@ async function doLogin() {
     });
     const data = await resp.json();
     if (resp.ok) {
-        showApp(data.name);
+        initApp();
     } else {
         err.textContent = data.message || 'Неверный email или пароль';
         document.getElementById('loginPassword').value = '';
@@ -941,17 +945,7 @@ window.onload = async () => {
     const resp = await fetch('/check-auth');
     const data = await resp.json();
     if (data.auth) {
-        document.getElementById('loginScreen').classList.add('hidden');
-        document.getElementById('app').classList.remove('hidden');
-        const ws = document.getElementById('welcomeScreen');
-        if (ws) ws.style.display = 'none';
-        fillExerciseSelect();
-        checkAdminAccess();
-        loadWorkoutSummary();
-        // Проверяем напоминание при входе
-        const rem = await fetch('/check-reminder').then(r=>r.json()).catch(()=>({}));
-        if (rem.days_since >= 3) maybeNotify(rem.days_since);
-        await restoreActiveWorkoutOnLoad();
+        await initApp();
     }
 };
 
@@ -994,6 +988,25 @@ function pickTargetDay(days, byDay) {
 
 let wsTarget = null;
 
+// Единственное место, которое перестраивает #daySelect из свежих /days — вызывается
+// и при обычной загрузке, и при переключении вкладок, и из менеджера дней, чтобы
+// селектор никогда не расходился со сводкой "Сегодня".
+function populateDaySelect(days) {
+    const sel = document.getElementById('daySelect');
+    if (!sel) return;
+    const activeIds = new Set(days.filter(d => d.active).map(d => String(d.id)));
+    Array.from(sel.options).forEach(o => { if (!activeIds.has(o.value)) o.remove(); });
+    const existing = new Set(Array.from(sel.options).map(o => o.value));
+    days.filter(d => d.active).forEach(d => {
+        if (!existing.has(String(d.id))) {
+            const o = document.createElement('option');
+            o.value = d.id;
+            o.textContent = d.name;
+            sel.appendChild(o);
+        }
+    });
+}
+
 async function loadWorkoutSummary() {
     const box = document.getElementById('workoutSummary');
     const now = new Date();
@@ -1005,6 +1018,7 @@ async function loadWorkoutSummary() {
             fetch('/days', {cache: 'no-store'}).then(r => r.json()),
             fetch('/workout-dates').then(r => r.json())
         ]);
+        populateDaySelect(days);
         wsTarget = pickTargetDay(days.filter(d => d.active), datesData.by_day || {});
         if (!wsTarget) { box.classList.add('hidden'); return; }
         box.classList.remove('hidden');
@@ -2519,7 +2533,6 @@ let dmDaysList = [];
 
 async function dmRefreshDays() {
     const sel = document.getElementById('dmDaySelect');
-    const mainSel = document.getElementById('daySelect');
     const resp = await fetch('/days', {cache: 'no-store'});
     if (!resp.ok) return;
     const days = await resp.json();
@@ -2527,19 +2540,7 @@ async function dmRefreshDays() {
     const prevVal = sel.value;
     sel.innerHTML = days.map(d => `<option value="${d.id}">${d.name}${d.active ? '' : ' (в архиве)'}</option>`).join('');
     if (prevVal && days.some(d => String(d.id) === prevVal)) sel.value = prevVal;
-    if (mainSel) {
-        const activeIds = new Set(days.filter(d => d.active).map(d => String(d.id)));
-        Array.from(mainSel.options).forEach(o => { if (!activeIds.has(o.value)) o.remove(); });
-        const existing = new Set(Array.from(mainSel.options).map(o => o.value));
-        days.filter(d => d.active).forEach(d => {
-            if (!existing.has(String(d.id))) {
-                const o = document.createElement('option');
-                o.value = d.id;
-                o.textContent = d.name;
-                mainSel.appendChild(o);
-            }
-        });
-    }
+    populateDaySelect(days);
     if (sel.value) dmLoadExercises(sel.value);
     document.getElementById('dmDeleteDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
     document.getElementById('dmEditDayBtn').style.display = dmIsAdmin ? 'inline-block' : 'none';
@@ -2791,9 +2792,6 @@ async function dmDeleteDay() {
     }
 }
 
-window.addEventListener('load', () => {
-    setTimeout(() => { dmRefreshDays().catch(()=>{}); }, 1500);
-});
 </script>
 </body>
 </html>
