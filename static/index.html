@@ -91,8 +91,10 @@
         td { border-bottom:1px solid var(--border); padding:6px 4px; text-align:center; vertical-align:middle; color:var(--text); }
         tr:last-child td { border-bottom:none; }
 
-        .difficulty-input { width:86px; padding:5px 6px; font-size:15px; border:1.5px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); margin-top:8px; }
-        .difficulty-input:focus { outline:none; border-color:var(--green); }
+        .difficulty-toggle { display:flex; gap:8px; margin-top:8px; }
+        .difficulty-btn { flex:1; padding:8px 6px; font-size:14px; font-weight:600; font-family:inherit; border:1.5px solid var(--border); border-radius:6px; background:transparent; color:var(--text2); cursor:pointer; }
+        .difficulty-btn.active { background:var(--green); border-color:var(--green); color:#fff; }
+        .difficulty-btn:disabled { opacity:.5; cursor:default; }
 
         /* Активный лог подходов */
         .ex-block { padding:16px 0; }
@@ -811,7 +813,7 @@ function saveTableState() {
     document.querySelectorAll('#exercisesBody .ex-block').forEach(block => {
         const exId = block.dataset.exerciseId;
         if (!exId) return;
-        const diff = block.querySelector('.difficulty-input')?.value || '';
+        const diff = block.querySelector('.difficulty-toggle')?.dataset.value || '';
         const skipped = block.dataset.skipped || '';
         const skipReason = block.dataset.skipReason || '';
         rows.push({exId, sets: exerciseSets[exId] || [], diff, skipped, skipReason});
@@ -821,6 +823,17 @@ function saveTableState() {
     try {
         sessionStorage.setItem('tableState', JSON.stringify(state));
     } catch(e) {}
+}
+
+function setToggleValue(toggle, value) {
+    toggle.dataset.value = value || '';
+    toggle.querySelectorAll('.difficulty-btn').forEach(b => b.classList.toggle('active', b.dataset.diff === value));
+}
+function setDifficulty(btn) {
+    const toggle = btn.closest('.difficulty-toggle');
+    if (!toggle) return;
+    setToggleValue(toggle, btn.dataset.diff);
+    saveTableState();
 }
 
 function restoreTableState() {
@@ -1371,7 +1384,11 @@ async function loadDay() {
                 <div class="ex-weight"><span class="ex-weight-num" onclick="editHeaderWeight(${ex.id}, this)">${targetWeight}</span><span class="ex-weight-unit">кг</span></div>
             </div>
             ${setsHtml}
-            <input type="text" class="difficulty-input" placeholder="Легко/Тяжело" oninput="saveTableState()">
+            <div class="difficulty-toggle" data-value="">
+                <button type="button" class="difficulty-btn" data-diff="Легко" onclick="setDifficulty(this)">Легко</button>
+                <button type="button" class="difficulty-btn" data-diff="Средне" onclick="setDifficulty(this)">Средне</button>
+                <button type="button" class="difficulty-btn" data-diff="Тяжело" onclick="setDifficulty(this)">Тяжело</button>
+            </div>
             <div class="divider"></div>
             <div class="ex-prev-target">
                 <div>Предыдущая: ${previous ? `${previous.weight} × ${previous.reps} × ${previous.sets}` : '—'}</div>
@@ -1409,8 +1426,8 @@ async function loadDayWithRestore(silent = false) {
                     });
                     const block = document.querySelector(`.ex-block[data-exercise-id="${exId}"]`);
                     if (block) {
-                        const diff = block.querySelector('.difficulty-input');
-                        if (diff) diff.value = saved.diff;
+                        const diff = block.querySelector('.difficulty-toggle');
+                        if (diff) setToggleValue(diff, saved.diff);
                         if (saved.skipped) applySkipState(block, true, saved.skipReason);
                     }
                 });
@@ -1437,8 +1454,8 @@ function applySkipState(block, skipped, reason) {
         delete block.dataset.skipped;
         delete block.dataset.skipReason;
     }
-    const diff = block.querySelector('.difficulty-input');
-    if (diff) diff.disabled = !!skipped;
+    const diff = block.querySelector('.difficulty-toggle');
+    if (diff) diff.querySelectorAll('.difficulty-btn').forEach(b => b.disabled = !!skipped);
 }
 function skipExercise(btn) {
     const block = btn.closest('.ex-block');
@@ -1601,11 +1618,11 @@ async function saveWorkout() {
             exercises.push({exercise_id: parseInt(exId), skipped: true, skip_reason: block.dataset.skipReason || ''});
             return;
         }
-        const diff = block.querySelector('.difficulty-input');
+        const diff = block.querySelector('.difficulty-toggle');
         const sets = [];
         (exerciseSets[exId] || []).forEach((s, i) => {
             if (!s.done) return;
-            sets.push({set_number: i + 1, weight: s.weight || 0, reps: s.reps || 0, difficulty: diff?.value || null, notes: note || null});
+            sets.push({set_number: i + 1, weight: s.weight || 0, reps: s.reps || 0, difficulty: diff?.dataset.value || null, notes: note || null});
         });
         if (sets.length > 0) exercises.push({exercise_id: parseInt(exId), sets});
     });
@@ -1625,7 +1642,7 @@ async function saveWorkout() {
             document.querySelectorAll('#exercisesBody .ex-block').forEach(block => {
                 const exId = block.dataset.exerciseId;
                 (exerciseSets[exId] || []).forEach((s, i) => { s.done = false; renderSetRowInto(exId, i); });
-                const d = block.querySelector('.difficulty-input'); if(d) d.value='';
+                const d = block.querySelector('.difficulty-toggle'); if(d) setToggleValue(d, '');
             });
             document.getElementById('workoutNote').value = '';
             updateTotalTonnage();
