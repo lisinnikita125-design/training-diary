@@ -10,6 +10,7 @@
     <meta name="apple-mobile-web-app-title" content="Progressor">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Bebas+Neue&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
     <meta name="theme-color" content="#14161B">
     
@@ -307,8 +308,10 @@
 
         /* Навигация */
         .nav-tabs { display:flex; gap:0; background:var(--card); border-radius:10px; padding:4px; margin-bottom:14px; box-shadow:var(--shadow); }
-        .nav-tab { flex:1; padding:8px; font-size:15px; font-weight:600; border:none; border-radius:7px; background:none; color:var(--text2); cursor:pointer; }
-        .nav-tab.active { background:linear-gradient(135deg,#2C5570,var(--green)); color:white; box-shadow:0 2px 8px rgba(60,110,158,0.3); }
+        .nav-tab { flex:1; display:flex; align-items:center; justify-content:center; padding:8px; font-size:15px; font-weight:600; border:none; border-radius:7px; background:none; color:var(--text2); cursor:pointer; }
+        .nav-tab i { font-size:22px; line-height:1; color:var(--text2); }
+        .nav-tab.active { background:var(--gl); }
+        .nav-tab.active i { color:var(--green); }
     </style>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
@@ -396,12 +399,12 @@
     </div>
 
     <div class="nav-tabs">
-        <button class="nav-tab active" onclick="showTab('workout')">🏋️</button>
-        <button class="nav-tab" onclick="showTab('history')">📋</button>
-        <button class="nav-tab" onclick="showTab('achievements')">🏆</button>
-          <button class="nav-tab" onclick="showTab('progress')">📈</button>
-        <button class="nav-tab" onclick="showTab('compare')">⚖️</button>
-        <button class="nav-tab" onclick="showTab('stats')">📊</button>
+        <button class="nav-tab active" onclick="showTab('workout')" aria-label="Тренировка"><i class="ti ti-barbell" aria-hidden="true"></i></button>
+        <button class="nav-tab" onclick="showTab('history')" aria-label="История"><i class="ti ti-history" aria-hidden="true"></i></button>
+        <button class="nav-tab" onclick="showTab('achievements')" aria-label="Достижения"><i class="ti ti-trophy" aria-hidden="true"></i></button>
+        <button class="nav-tab" onclick="showTab('progress')" aria-label="Прогресс"><i class="ti ti-trending-up" aria-hidden="true"></i></button>
+        <button class="nav-tab" onclick="showTab('compare')" aria-label="Сравнение"><i class="ti ti-scale" aria-hidden="true"></i></button>
+        <button class="nav-tab" onclick="showTab('stats')" aria-label="Статистика"><i class="ti ti-chart-bar" aria-hidden="true"></i></button>
     </div>
 
     <!-- ═══ ТРЕНИРОВКА ═══ -->
