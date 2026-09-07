@@ -152,8 +152,23 @@
         #totalTonnage span { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:17px; font-weight:700; color:var(--green); }
 
         /* Прогресс */
-        .progress-controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-        #exerciseSelect { flex:1; min-width:180px; }
+        .progress-title { font-size:28px; font-weight:700; color:var(--text); letter-spacing:-0.3px; margin-bottom:4px; }
+        .period-tabs { display:flex; gap:20px; margin-bottom:2px; }
+        .period-tab { background:none; border:none; padding:4px 0 8px; font-size:15px; font-weight:600; color:var(--text2); cursor:pointer; border-bottom:2px solid transparent; }
+        .period-tab.active { color:var(--text); border-bottom-color:var(--text); }
+        .strength-index-val { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:44px; font-weight:700; color:var(--green); display:block; line-height:1.1; }
+        #progressChart { width:100%; margin:6px 0 4px; }
+        .progress-stats-row { display:flex; }
+        .progress-stat { flex:1; text-align:left; }
+        .progress-stat .num { font-size:26px; font-weight:700; color:var(--text); display:block; }
+        .progress-stat .num.record { color:var(--record); }
+        .progress-stat .lbl { font-size:15px; color:var(--text2); margin-top:2px; display:block; }
+        .progress-ex-row { display:flex; align-items:baseline; justify-content:space-between; padding:10px 0; gap:10px; }
+        .progress-ex-name { font-size:15px; color:var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .progress-ex-weight { font-family:var(--font-num); font-variant-numeric:tabular-nums; font-size:22px; font-weight:700; color:var(--text); white-space:nowrap; }
+        .progress-ex-delta { font-size:13px; color:var(--green); min-width:44px; text-align:right; white-space:nowrap; }
+        .progress-show-all { display:block; width:100%; text-align:left; background:none; border:none; color:var(--text2); font-size:15px; font-weight:600; cursor:pointer; padding:10px 0 0; }
+        #progressSearch { width:100%; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); font-size:15px; margin:10px 0 4px; }
         .chart-tabs { display:flex; gap:6px; margin:12px 0 6px; }
         .chart-tab { padding:6px 14px; font-size:15px; border-radius:20px; border:1.5px solid var(--green); background:var(--card); color:var(--green); cursor:pointer; font-weight:500; }
         .chart-tab.active { background:var(--green); color:white; }
@@ -480,24 +495,35 @@
 
     <!-- ═══ ПРОГРЕСС ═══ -->
     <div id="tab-progress" class="hidden">
-        <div class="section">
-            <div class="progress-controls">
-                <select id="exerciseSelect"></select>
-                <button class="btn-secondary" onclick="showProgress()">Показать</button>
+        <div id="progressScreen">
+            <div class="progress-title">Прогресс</div>
+            <div class="ws-label" style="margin-top:10px;">Последние</div>
+            <div class="period-tabs">
+                <button class="period-tab" data-period="1m" onclick="setProgressPeriod('1m')">1М</button>
+                <button class="period-tab active" data-period="3m" onclick="setProgressPeriod('3m')">3М</button>
+                <button class="period-tab" data-period="6m" onclick="setProgressPeriod('6m')">6М</button>
+                <button class="period-tab" data-period="1y" onclick="setProgressPeriod('1y')">1Г</button>
             </div>
-            <div id="progressContent" class="hidden">
-                <div class="chart-tabs">
-                    <button class="chart-tab active" onclick="switchChart('weight',this)">Макс. вес</button>
-                    <button class="chart-tab" onclick="switchChart('tonnage',this)">Тоннаж</button>
-                </div>
-                <canvas id="progressChart" height="180" style="margin-bottom:16px;"></canvas>
-                <div class="table-wrap">
-                    <table id="historyTable">
-                        <thead><tr><th>Дата</th><th>Подход</th><th>Вес</th><th>Повт.</th><th>Слож.</th><th>✏️</th></tr></thead>
-                        <tbody id="historyBody"></tbody>
-                    </table>
-                </div>
+
+            <div class="divider"></div>
+
+            <div class="ws-label">СИЛА</div>
+            <span class="strength-index-val" id="strengthIndexVal">—</span>
+            <canvas id="progressChart" height="90"></canvas>
+
+            <div class="divider"></div>
+
+            <div class="progress-stats-row">
+                <div class="progress-stat"><span class="num" id="progressWorkouts">—</span><span class="lbl">тренировок</span></div>
+                <div class="progress-stat"><span class="num" id="progressTonnage">—</span><span class="lbl">кг тоннаж</span></div>
+                <div class="progress-stat"><span class="num record" id="progressRecords">—</span><span class="lbl">рекорда</span></div>
             </div>
+
+            <div class="divider"></div>
+
+            <div id="progressExList"></div>
+            <input id="progressSearch" class="hidden" type="text" placeholder="Поиск упражнения..." oninput="renderProgressExercises()">
+            <button class="progress-show-all" id="progressShowAllBtn" onclick="toggleProgressShowAll()">Показать все →</button>
         </div>
     </div>
 
@@ -642,12 +668,12 @@ function togglePassword(inputId, btn) {
 // ══════════════════════════════════════════════
 let progressChartInstance = null;
 let weeklyChartInstance = null;
-let currentChartMode = 'weight';
-let currentStats = null;
 let globalTimer = null;
 let exerciseSets = {};
 let exerciseMeta = {};
-let historyData = [];
+let progressPeriod = '3m';
+let progressData = null;
+let progressShowAll = false;
 
 
 
@@ -722,7 +748,6 @@ async function initApp() {
     document.getElementById('app').classList.remove('hidden');
     const ws = document.getElementById('welcomeScreen');
     if (ws) ws.style.display = 'none';
-    fillExerciseSelect();
     checkAdminAccess();
     await loadWorkoutSummary();
     const rem = await fetch('/check-reminder').then(r=>r.json()).catch(()=>({}));
@@ -1209,6 +1234,7 @@ function showTab(name) {
     if (name === 'compare') loadCompareDates();
     if (name === 'history') loadWorkoutHistory();
     if (name === 'workout') loadWorkoutSummary();
+    if (name === 'progress') loadProgress();
 }
 
 // ══════════════════════════════════════════════
@@ -1658,121 +1684,111 @@ async function saveWorkout() {
 // ══════════════════════════════════════════════
 //  ПРОГРЕСС
 // ══════════════════════════════════════════════
-async function fillExerciseSelect() {
-    const data = await (await fetch('/exercise-names')).json();
-    const sel = document.getElementById('exerciseSelect');
-    sel.innerHTML = '';
-    data.names.forEach(n => { const o = document.createElement('option'); o.value = o.textContent = n; sel.appendChild(o); });
-}
-async function showProgress() {
-    const exName = document.getElementById('exerciseSelect').value;
-    const [grouped, stats] = await Promise.all([
-        fetch(`/progress-by-name-grouped?name=${encodeURIComponent(exName)}`).then(r=>r.json()),
-        fetch(`/workout-stats?name=${encodeURIComponent(exName)}`).then(r=>r.json())
-    ]);
-    // Разворачиваем в плоский массив для редактирования, сохраняем группировку
-    historyData = [];
-    grouped.grouped.forEach(g => g.sets.forEach(s => historyData.push(s)));
-    currentStats = stats;
-    renderHistoryGrouped(grouped.grouped);
-    document.getElementById('progressContent').classList.remove('hidden');
-    drawChart(currentChartMode);
-}
-function renderHistoryTable(history) {
-    const tbody = document.getElementById('historyBody');
-    tbody.innerHTML = '';
-    history.forEach((entry, idx) => {
-        const row = document.createElement('tr');
-        row.id = `hist-row-${idx}`;
-        row.innerHTML = `<td>${entry.workout_date}</td><td>${entry.set_number}</td><td>${entry.weight} кг</td><td>${entry.reps}</td><td>${entry.difficulty||'—'}</td><td><button class="timer-btn" onclick="editHistoryRow(${idx})">✏️</button></td>`;
-        tbody.appendChild(row);
-    });
-}
-
-function renderHistoryGrouped(grouped) {
-    const tbody = document.getElementById('historyBody');
-    tbody.innerHTML = '';
-    let globalIdx = 0;
-    grouped.forEach(group => {
-        // Заголовок даты
-        const dateRow = document.createElement('tr');
-        dateRow.innerHTML = `<td colspan="6" style="background:var(--gl);font-weight:700;color:var(--green);font-size:15px;padding:6px 8px;text-align:left;">📅 ${group.date}<button onclick="deleteWorkoutByDate('${group.date}')" style="float:right;background:none;border:none;cursor:pointer;font-size:15px;color:#c62828;padding:0 4px;" title="Удалить тренировку">🗑️</button></td>`;
-        tbody.appendChild(dateRow);
-        // Подходы
-        group.sets.forEach(entry => {
-            const idx = globalIdx++;
-            const row = document.createElement('tr');
-            row.id = `hist-row-${idx}`;
-            row.innerHTML = `<td>—</td><td>${entry.set_number}</td><td>${entry.weight} кг</td><td>${entry.reps}</td><td>${entry.difficulty||'—'}</td><td><button class="timer-btn" onclick="editHistoryRow(${idx})">✏️</button></td>`;
-            tbody.appendChild(row);
-        });
-    });
-}
 async function deleteWorkoutByDate(date) {
     if (!confirm(`Удалить тренировку за ${date}? Это действие нельзя отменить.`)) return;
     const resp = await fetch("/delete-workout", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({workout_date: date})});
     if (resp.ok) {
         showToast("✅ Тренировка удалена");
-        const exName = document.getElementById("exerciseSelect").value;
-        if (exName) {
-            currentStats = await (await fetch(`/workout-stats?name=${encodeURIComponent(exName)}`)).json();
-            drawChart(currentChartMode);
-            const hist = await (await fetch(`/workout-history?name=${encodeURIComponent(exName)}`)).json();
-            historyData = hist.history || [];
-            renderHistoryTable(historyData);
-        }
+        loadWorkoutHistory();
+        if (!document.getElementById('tab-progress').classList.contains('hidden')) loadProgress();
     } else { showToast("Ошибка удаления", true); }
 }
 
-function editHistoryRow(idx) {
-    const e = historyData[idx];
-    const row = document.getElementById(`hist-row-${idx}`);
-    row.classList.add('edit-row');
-    row.innerHTML = `
-        <td>${e.workout_date}</td><td>${e.set_number}</td>
-        <td><input class="edit-input" type="number" id="ew-${idx}" value="${e.weight}" step="0.5"></td>
-        <td><input class="edit-input" type="number" id="er-${idx}" value="${e.reps}"></td>
-        <td><input class="edit-input" type="text" id="ed-${idx}" value="${e.difficulty||''}" style="width:70px"></td>
-        <td>
-            <button class="btn-primary btn-sm" onclick="saveHistoryRow(${idx})">✓</button>
-            <button class="btn-secondary btn-sm" style="margin-top:2px" onclick="renderHistoryTable(historyData)">✕</button>
-        </td>`;
+function setProgressPeriod(period) {
+    if (progressPeriod === period) return;
+    progressPeriod = period;
+    document.querySelectorAll('.period-tab').forEach(b => b.classList.toggle('active', b.dataset.period === period));
+    loadProgress();
 }
-async function saveHistoryRow(idx) {
-    const exName = document.getElementById('exerciseSelect').value;
-    const entry = historyData[idx];
-    const body = {exercise_name:exName, workout_date:entry.workout_date, set_number:entry.set_number,
-        weight:parseFloat(document.getElementById(`ew-${idx}`).value),
-        reps:parseInt(document.getElementById(`er-${idx}`).value),
-        difficulty:document.getElementById(`ed-${idx}`).value};
-    const resp = await fetch('/edit-log', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    if (resp.ok) {
-        historyData[idx] = {...entry, ...body};
-        renderHistoryTable(historyData);
-        showToast('✅ Сохранено');
-        currentStats = await (await fetch(`/workout-stats?name=${encodeURIComponent(exName)}`)).json();
-        drawChart(currentChartMode);
-    } else { showToast('Ошибка', true); }
+
+async function loadProgress() {
+    const strengthEl = document.getElementById('strengthIndexVal');
+    strengthEl.textContent = '…';
+    try {
+        const data = await (await fetch(`/progress-summary?period=${progressPeriod}`)).json();
+        progressData = data;
+
+        strengthEl.textContent = data.strength_index_pct === null ? '—' :
+            (data.strength_index_pct >= 0 ? '+' : '') + data.strength_index_pct.toFixed(1) + '%';
+
+        document.getElementById('progressWorkouts').textContent = data.workouts_count;
+        document.getElementById('progressTonnage').textContent = formatTonnageK(data.tonnage_kg);
+        document.getElementById('progressRecords').textContent = data.records_count;
+
+        drawStrengthChart(data.chart);
+
+        progressShowAll = false;
+        document.getElementById('progressSearch').classList.add('hidden');
+        document.getElementById('progressSearch').value = '';
+        document.getElementById('progressShowAllBtn').textContent = 'Показать все →';
+        renderProgressExercises();
+    } catch (e) {
+        strengthEl.textContent = '—';
+    }
 }
-function switchChart(mode, btn) {
-    currentChartMode = mode;
-    document.querySelectorAll('.chart-tab').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    if (currentStats) drawChart(mode);
+
+function formatTonnageK(kg) {
+    return (kg / 1000).toFixed(1) + 'К';
 }
-function drawChart(mode) {
+
+function drawStrengthChart(chart) {
     const canvas = document.getElementById('progressChart');
-    if (!currentStats?.stats?.length) { canvas.classList.add('hidden'); return; }
-    canvas.classList.remove('hidden');
-    const dates = currentStats.stats.map(r => r.workout_date);
-    const values = currentStats.stats.map(r => mode==='weight' ? r.max_weight : r.tonnage);
-    const label = mode==='weight' ? 'Макс. вес (кг)' : 'Тоннаж (кг)';
-    const color = mode==='weight' ? '#2e7d32' : '#1565c0';
     if (progressChartInstance) progressChartInstance.destroy();
+    const points = (chart || []).filter(p => p.value !== null);
+    if (!points.length) { canvas.classList.add('hidden'); return; }
+    canvas.classList.remove('hidden');
     progressChartInstance = new Chart(canvas.getContext('2d'), {
-        type:'line', data:{labels:dates, datasets:[{label, data:values, borderColor:color, backgroundColor:color.replace(')',',0.15)').replace('rgb','rgba'), tension:.3, pointRadius:5, pointBackgroundColor:color, fill:true}]},
-        options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:false, title:{display:true,text:label}}, x:{title:{display:true,text:'Дата'}}}}
+        type: 'line',
+        data: {
+            labels: points.map(p => p.date),
+            datasets: [{
+                data: points.map(p => p.value),
+                borderColor: '#3C6E9E',
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.35,
+                fill: false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            scales: {
+                x: { display: false },
+                y: { display: false }
+            }
+        }
     });
+}
+
+function toggleProgressShowAll() {
+    progressShowAll = !progressShowAll;
+    document.getElementById('progressSearch').classList.toggle('hidden', !progressShowAll);
+    document.getElementById('progressShowAllBtn').textContent = progressShowAll ? 'Скрыть' : 'Показать все →';
+    renderProgressExercises();
+}
+
+function renderProgressExercises() {
+    const list = document.getElementById('progressExList');
+    if (!progressData) { list.innerHTML = ''; return; }
+    let exercises = progressData.exercises || [];
+    if (progressShowAll) {
+        const q = document.getElementById('progressSearch').value.trim().toLowerCase();
+        if (q) exercises = exercises.filter(e => e.name.toLowerCase().includes(q));
+    } else {
+        exercises = exercises.slice(0, 5);
+    }
+    if (!exercises.length) {
+        list.innerHTML = '<div style="color:var(--text2);font-size:15px;padding:10px 0;">Нет данных за период</div>';
+        return;
+    }
+    list.innerHTML = exercises.map(e => `
+        <div class="progress-ex-row">
+            <span class="progress-ex-name">${e.name}</span>
+            <span class="progress-ex-weight">${e.current_weight}</span>
+            <span class="progress-ex-delta">${e.delta_pct === null ? '' : (e.delta_pct >= 0 ? '+' : '') + e.delta_pct.toFixed(0) + '%'}</span>
+        </div>`).join('<div class="divider" style="margin:0;"></div>');
 }
 
 // ══════════════════════════════════════════════
