@@ -1,4 +1,4 @@
-const CACHE_NAME = 'training-diary-v3';
+const CACHE_NAME = 'training-diary-v4';
 const STATIC_ASSETS = [
     '/static/index.html',
     'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
@@ -19,7 +19,7 @@ self.addEventListener('activate', event => {
     );
 });
 
-// Network first для API, cache first для статики
+// Network first для API и HTML-документа, cache first для остальной статики
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
 
@@ -35,7 +35,27 @@ self.addEventListener('fetch', event => {
         return; // Не перехватываем API
     }
 
-    // Статика — cache first
+    // HTML-документ (сама разметка) — network first: новая версия index.html
+    // доходит до уже заходивших пользователей сразу после деплоя, без ручной
+    // чистки кэша и без необходимости поднимать CACHE_NAME вручную.
+    const isHTML = event.request.mode === 'navigate' || url.pathname === '/static/index.html';
+    if (isHTML) {
+        event.respondWith(
+            fetch(event.request, { cache: 'no-store' }).then(resp => {
+                if (resp.ok) {
+                    const clone = resp.clone();
+                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+                }
+                return resp;
+            }).catch(() => {
+                // Офлайн — отдаём последнюю успешно закэшированную версию
+                return caches.match(event.request).then(cached => cached || caches.match('/static/index.html'));
+            })
+        );
+        return;
+    }
+
+    // Остальная статика (JS, манифест, иконки) — cache first
     event.respondWith(
         caches.match(event.request).then(cached => {
             if (cached) return cached;
@@ -45,12 +65,7 @@ self.addEventListener('fetch', event => {
                     caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
                 }
                 return resp;
-            }).catch(() => {
-                // Офлайн — возвращаем кэшированный index.html
-                if (event.request.mode === 'navigate') {
-                    return caches.match('/static/index.html');
-                }
-            });
+            }).catch(() => {});
         })
     );
 });
