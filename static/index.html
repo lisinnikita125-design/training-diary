@@ -98,6 +98,7 @@
         .ex-block { padding:16px 0; }
         .ex-header { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:10px; }
         .ex-header .ex-name { font-size:16px; font-weight:600; color:var(--text); text-align:left; }
+        .ex-header .ex-model { font-size:12px; font-weight:400; color:var(--text2); margin-left:6px; }
         .ex-weight { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:34px; font-weight:700; color:var(--text); white-space:nowrap; }
         .ex-weight .ex-weight-unit { font-family:'Inter',sans-serif; font-size:15px; font-weight:600; color:var(--text2); letter-spacing:0; margin-left:4px; }
         .ex-weight-num { cursor:pointer; }
@@ -1366,7 +1367,7 @@ async function loadDay() {
         block.dataset.exName = ex.name;
         block.innerHTML = `
             <div class="ex-header">
-                <div class="ex-name">${ex.name}</div>
+                <div class="ex-name">${ex.name}${ex.machine_model ? `<span class="ex-model">${ex.machine_model}</span>` : ''}</div>
                 <div class="ex-weight"><span class="ex-weight-num" onclick="editHeaderWeight(${ex.id}, this)">${targetWeight}</span><span class="ex-weight-unit">кг</span></div>
             </div>
             ${setsHtml}
