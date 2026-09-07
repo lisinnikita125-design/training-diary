@@ -1159,6 +1159,161 @@ def stats_summary():
     })
 
 
+# ══════════════════════════════════════════════
+#  ПРОГРЕСС — Индекс силы (e1RM)
+# ══════════════════════════════════════════════
+PROGRESS_PERIOD_DAYS = {"1m": 30, "3m": 90, "6m": 182, "1y": 365}
+
+
+def _e1rm(weight, reps):
+    return (weight or 0) * (1 + min(reps or 0, 12) / 30)
+
+
+@app.route("/progress-summary")
+def progress_summary():
+    """
+    Индекс силы: средний % изменения e1RM (среднее первых 2 недель периода
+    против среднего последних 2 недель периода) по упражнениям, у которых
+    есть тренировки в обоих окнах. Плюс тоннаж/тренировки/рекорды/список
+    упражнений за тот же период — всё пересчитывается на смену периода.
+    """
+    require_auth()
+    uid = current_user_id()
+    period = request.args.get("period", "3m")
+    days = PROGRESS_PERIOD_DAYS.get(period, PROGRESS_PERIOD_DAYS["3m"])
+
+    period_end = datetime.today().date()
+    period_start = period_end - timedelta(days=days)
+    first_window_end = period_start + timedelta(days=14)   # исключительно
+    last_window_start = period_end - timedelta(days=14)     # исключительно
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    rows = cur.execute("""
+        SELECT wl.id as id, e.name as name, wl.workout_date as d,
+               wl.weight as weight, wl.reps as reps
+        FROM workout_log wl
+        JOIN exercises e ON e.id = wl.exercise_id
+        WHERE wl.user_id = ? AND wl.set_number > 0
+          AND wl.workout_date >= ? AND wl.workout_date <= ?
+        ORDER BY wl.workout_date, wl.id
+    """, (uid, period_start.isoformat(), period_end.isoformat())).fetchall()
+
+    workouts_count = len({r["d"] for r in rows})
+    tonnage_kg = sum((r["weight"] or 0) * (r["reps"] or 0) for r in rows)
+
+    # e1RM/макс.вес лучшей попытки в каждой сессии (упражнение × дата)
+    session_e1rm = {}     # name -> {date: best_e1rm}
+    session_weight = {}   # name -> {date: max_weight}
+    for r in rows:
+        name, d = r["name"], r["d"]
+        w = r["weight"] or 0
+        e1rm = _e1rm(w, r["reps"])
+        session_e1rm.setdefault(name, {})
+        session_weight.setdefault(name, {})
+        if d not in session_e1rm[name] or e1rm > session_e1rm[name][d]:
+            session_e1rm[name][d] = e1rm
+        if d not in session_weight[name] or w > session_weight[name][d]:
+            session_weight[name][d] = w
+
+    first_window_end_s = first_window_end.isoformat()
+    last_window_start_s = last_window_start.isoformat()
+
+    exercises_out = []
+    qualifying = {}  # name -> {baseline_avg, pct}
+    for name, e1rm_by_date in session_e1rm.items():
+        dates_sorted = sorted(e1rm_by_date.keys())
+        last_date = dates_sorted[-1]
+
+        first_vals = [v for d, v in e1rm_by_date.items() if d < first_window_end_s]
+        last_vals = [v for d, v in e1rm_by_date.items() if d > last_window_start_s]
+
+        delta_pct = None
+        if first_vals and last_vals:
+            baseline_avg = sum(first_vals) / len(first_vals)
+            final_avg = sum(last_vals) / len(last_vals)
+            if baseline_avg > 0:
+                delta_pct = (final_avg - baseline_avg) / baseline_avg * 100
+                qualifying[name] = {"baseline_avg": baseline_avg, "pct": delta_pct}
+
+        exercises_out.append({
+            "name": name,
+            "current_weight": session_weight[name][last_date],
+            "delta_pct": round(delta_pct, 1) if delta_pct is not None else None,
+            "sessions_in_period": len(dates_sorted),
+            "last_date": last_date
+        })
+
+    exercises_out.sort(key=lambda x: (x["sessions_in_period"], x["last_date"]), reverse=True)
+
+    strength_index_pct = None
+    if qualifying:
+        strength_index_pct = round(
+            sum(v["pct"] for v in qualifying.values()) / len(qualifying), 1
+        )
+
+    # ── Тренд-график: недельные бакеты, forward-fill по каждому
+    #    квалифицированному упражнению, нормализация к его baseline_avg ──
+    buckets = []
+    b_start = period_start
+    while b_start <= period_end:
+        b_end = min(b_start + timedelta(days=7), period_end + timedelta(days=1))
+        buckets.append((b_start.isoformat(), b_end.isoformat()))
+        b_start = b_end
+
+    chart = []
+    if qualifying:
+        series = {}
+        for name, info in qualifying.items():
+            e1rm_by_date = session_e1rm[name]
+            baseline_avg = info["baseline_avg"]
+            vals = []
+            last_val = None
+            for b_start_s, b_end_s in buckets:
+                bucket_e1rms = [v for d, v in e1rm_by_date.items() if b_start_s <= d < b_end_s]
+                if bucket_e1rms:
+                    last_val = (sum(bucket_e1rms) / len(bucket_e1rms)) / baseline_avg
+                vals.append(last_val)
+            series[name] = vals
+
+        for i, (b_start_s, _) in enumerate(buckets):
+            pool = [series[name][i] for name in series if series[name][i] is not None]
+            value = round((sum(pool) / len(pool) - 1) * 100, 1) if pool else None
+            chart.append({"date": b_start_s, "value": value})
+
+    # ── Рекорды веса за период: сколько раз в периоде обновлялся
+    #    исторический максимум веса упражнения ──
+    prior_max_rows = cur.execute("""
+        SELECT e.name as name, MAX(wl.weight) as w
+        FROM workout_log wl
+        JOIN exercises e ON e.id = wl.exercise_id
+        WHERE wl.user_id = ? AND wl.set_number > 0 AND wl.workout_date < ?
+        GROUP BY e.name
+    """, (uid, period_start.isoformat())).fetchall()
+    running_max = {r["name"]: (r["w"] or 0) for r in prior_max_rows}
+
+    records_count = 0
+    for r in rows:  # уже отсортированы по (workout_date, id)
+        name, w = r["name"], (r["weight"] or 0)
+        if w > running_max.get(name, 0):
+            running_max[name] = w
+            records_count += 1
+
+    conn.close()
+    return jsonify({
+        "period": period,
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat(),
+        "strength_index_pct": strength_index_pct,
+        "chart": chart,
+        "workouts_count": workouts_count,
+        "tonnage_kg": round(tonnage_kg, 1),
+        "records_count": records_count,
+        "exercises": exercises_out
+    })
+
+
 @app.route("/export-csv")
 def export_csv():
     require_auth()
