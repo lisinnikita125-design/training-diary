@@ -2603,8 +2603,10 @@ function dmCancelDayEdit() {
 }
 
 let dmEditingExerciseId = null;
+let dmSavingExercise = false;
 
 async function dmAddExercise() {
+    if (dmSavingExercise) return;
     const msg = document.getElementById('dmMsg');
     const dayId = document.getElementById('dmDaySelect').value;
     const name = document.getElementById('dmExName').value.trim();
@@ -2619,6 +2621,11 @@ async function dmAddExercise() {
         default_weight: document.getElementById('dmExWeight').value ? parseFloat(document.getElementById('dmExWeight').value) : null,
         rest_seconds: document.getElementById('dmExRest').value ? parseInt(document.getElementById('dmExRest').value) : null
     };
+    const btn = document.getElementById('dmExSaveBtn');
+    const originalText = btn.textContent;
+    dmSavingExercise = true;
+    btn.disabled = true;
+    btn.textContent = 'Сохраняю...';
     try {
         const resp = editingId
             ? await fetch('/exercise/' + editingId, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
@@ -2631,6 +2638,10 @@ async function dmAddExercise() {
     } catch(e) {
         msg.style.color = '#c62828';
         msg.textContent = 'Ошибка сохранения';
+        btn.textContent = originalText;
+    } finally {
+        dmSavingExercise = false;
+        btn.disabled = false;
     }
 }
 
