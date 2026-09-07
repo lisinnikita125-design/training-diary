@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, abort, session, Response
 from database import get_db, init_db, seed_user
-import os, shutil, csv, io, secrets, json, html
+import os, shutil, csv, io, secrets, json, html, statistics
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -1191,13 +1191,12 @@ def progress_summary():
     cur = conn.cursor()
 
     rows = cur.execute("""
-        SELECT wl.id as id, e.name as name, wl.workout_date as d,
+        SELECT e.name as name, wl.workout_date as d,
                wl.weight as weight, wl.reps as reps
         FROM workout_log wl
         JOIN exercises e ON e.id = wl.exercise_id
         WHERE wl.user_id = ? AND wl.set_number > 0
           AND wl.workout_date >= ? AND wl.workout_date <= ?
-        ORDER BY wl.workout_date, wl.id
     """, (uid, period_start.isoformat(), period_end.isoformat())).fetchall()
 
     workouts_count = len({r["d"] for r in rows})
@@ -1221,7 +1220,10 @@ def progress_summary():
     last_window_start_s = last_window_start.isoformat()
 
     exercises_out = []
-    qualifying = {}  # name -> {baseline_avg, pct}
+    # Медиана вместо среднего — устойчивее к единичной аномальной сессии
+    # (разгрузка/техническая тренировка), случайно попавшей в узкое
+    # 2-недельное окно.
+    qualifying = {}  # name -> {baseline_med, pct}
     for name, e1rm_by_date in session_e1rm.items():
         dates_sorted = sorted(e1rm_by_date.keys())
         last_date = dates_sorted[-1]
@@ -1231,11 +1233,11 @@ def progress_summary():
 
         delta_pct = None
         if first_vals and last_vals:
-            baseline_avg = sum(first_vals) / len(first_vals)
-            final_avg = sum(last_vals) / len(last_vals)
-            if baseline_avg > 0:
-                delta_pct = (final_avg - baseline_avg) / baseline_avg * 100
-                qualifying[name] = {"baseline_avg": baseline_avg, "pct": delta_pct}
+            baseline_med = statistics.median(first_vals)
+            final_med = statistics.median(last_vals)
+            if baseline_med > 0:
+                delta_pct = (final_med - baseline_med) / baseline_med * 100
+                qualifying[name] = {"baseline_med": baseline_med, "pct": delta_pct}
 
         exercises_out.append({
             "name": name,
@@ -1249,12 +1251,11 @@ def progress_summary():
 
     strength_index_pct = None
     if qualifying:
-        strength_index_pct = round(
-            sum(v["pct"] for v in qualifying.values()) / len(qualifying), 1
-        )
+        strength_index_pct = round(statistics.median([v["pct"] for v in qualifying.values()]), 1)
 
     # ── Тренд-график: недельные бакеты, forward-fill по каждому
-    #    квалифицированному упражнению, нормализация к его baseline_avg ──
+    #    квалифицированному упражнению, нормализация к его baseline_med.
+    #    Между упражнениями бакет агрегируется медианой — по той же причине. ──
     buckets = []
     b_start = period_start
     while b_start <= period_end:
@@ -1267,23 +1268,26 @@ def progress_summary():
         series = {}
         for name, info in qualifying.items():
             e1rm_by_date = session_e1rm[name]
-            baseline_avg = info["baseline_avg"]
+            baseline_med = info["baseline_med"]
             vals = []
             last_val = None
             for b_start_s, b_end_s in buckets:
                 bucket_e1rms = [v for d, v in e1rm_by_date.items() if b_start_s <= d < b_end_s]
                 if bucket_e1rms:
-                    last_val = (sum(bucket_e1rms) / len(bucket_e1rms)) / baseline_avg
+                    last_val = statistics.median(bucket_e1rms) / baseline_med
                 vals.append(last_val)
             series[name] = vals
 
         for i, (b_start_s, _) in enumerate(buckets):
             pool = [series[name][i] for name in series if series[name][i] is not None]
-            value = round((sum(pool) / len(pool) - 1) * 100, 1) if pool else None
+            value = round((statistics.median(pool) - 1) * 100, 1) if pool else None
             chart.append({"date": b_start_s, "value": value})
 
     # ── Рекорды веса за период: сколько раз в периоде обновлялся
-    #    исторический максимум веса упражнения ──
+    #    исторический максимум веса упражнения. Считаем по ТРЕНИРОВКЕ
+    #    (лучший подход сессии), а не по каждому подходу — иначе разминочная
+    #    пирамида (лёгкий → рабочий вес в одной тренировке) даёт несколько
+    #    "рекордов" за одну сессию. Та же логика, что и в /check-pr. ──
     prior_max_rows = cur.execute("""
         SELECT e.name as name, MAX(wl.weight) as w
         FROM workout_log wl
@@ -1294,11 +1298,12 @@ def progress_summary():
     running_max = {r["name"]: (r["w"] or 0) for r in prior_max_rows}
 
     records_count = 0
-    for r in rows:  # уже отсортированы по (workout_date, id)
-        name, w = r["name"], (r["weight"] or 0)
-        if w > running_max.get(name, 0):
-            running_max[name] = w
-            records_count += 1
+    for name, weight_by_date in session_weight.items():
+        for d in sorted(weight_by_date.keys()):
+            w = weight_by_date[d]
+            if w > running_max.get(name, 0):
+                running_max[name] = w
+                records_count += 1
 
     conn.close()
     return jsonify({
