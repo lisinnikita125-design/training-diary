@@ -241,6 +241,60 @@
         }
         #prBanner.show { transform: translateX(-50%) translateY(0); }
 
+        /* PR баннер — анимация личного рекорда */
+        #prBannerContent.pr-shake { animation: prShake 180ms ease-out; animation-delay: 90ms; }
+        @keyframes prShake {
+            0%, 100% { transform: translate(0,0); }
+            20% { transform: translate(-2px,0); }
+            40% { transform: translate(2px,0); }
+            60% { transform: translate(-1.5px,0); }
+            80% { transform: translate(1.5px,0); }
+        }
+        #prBanner .pr-num {
+            display: inline-block;
+            position: relative;
+        }
+        #prBanner .pr-num.pr-drop {
+            animation: prNumDrop 120ms cubic-bezier(0.15,0.85,0.35,1) both;
+        }
+        @keyframes prNumDrop {
+            0% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+        #prBanner .pr-num.pr-drop::after {
+            content: "";
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 14px; height: 14px;
+            margin: -7px 0 0 -7px;
+            border: 1.5px solid var(--record);
+            border-radius: 50%;
+            opacity: 0;
+            pointer-events: none;
+            animation: prShockwave 400ms ease-out both;
+            animation-delay: 90ms;
+        }
+        @keyframes prShockwave {
+            0% { transform: scale(0.6); opacity: 0.9; }
+            100% { transform: scale(2.6); opacity: 0; }
+        }
+        .pr-chalk {
+            position: fixed;
+            width: 4px; height: 4px;
+            background: #fff;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 401;
+            opacity: 0.9;
+            animation: prChalkFall 550ms cubic-bezier(0.3,0.6,0.7,1) both;
+            animation-delay: 90ms;
+        }
+        @keyframes prChalkFall {
+            0% { transform: translate(0,0) scale(1); opacity: 0.9; }
+            30% { transform: translate(calc(var(--dx) * 0.4), calc(var(--dy) * 0.2 - 6px)); opacity: 0.9; }
+            100% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
+        }
+
         .hidden { display:none; }
 
         /* Toast */
@@ -259,7 +313,7 @@
 
 <!-- Таймер баннер -->
 <div id="restBar" onclick="cancelGlobalTimer()"><span class="rest-label">Отдых · нажми чтобы отменить</span><span class="rest-num" id="restBarNum">—</span></div>
-<div id="prBanner"></div>
+<div id="prBanner"><div id="prBannerContent"></div></div>
 <div id="workoutTimer">⏱ <span id="workoutTimerText">0:00</span></div>
 
 <!-- ═══════════ ЭКРАН ВХОДА ═══════════ -->
@@ -1901,14 +1955,16 @@ async function checkPR(date) {
 let prBannerTimer = null;
 function showPRBanner(prs) {
     const banner = document.getElementById('prBanner');
+    const content = document.getElementById('prBannerContent');
     const lines = prs.map(pr => {
+        const num = '<span class="pr-num pr-drop">' + pr.new + '</span>';
         if (pr.type === 'weight') {
-            return '🏆 ' + pr.exercise + ': ' + pr.old + ' → ' + pr.new + ' кг!';
+            return '🏆 ' + pr.exercise + ': ' + pr.old + ' → ' + num + ' кг!';
         } else {
-            return '💪 ' + pr.exercise + ': ' + pr.old + ' → ' + pr.new + ' повт!';
+            return '💪 ' + pr.exercise + ': ' + pr.old + ' → ' + num + ' повт!';
         }
     });
-    banner.innerHTML = '🎉 НОВЫЙ РЕКОРД!<br><span style="font-size:15px;font-weight:500;">' + lines.join('<br>') + '</span>';
+    content.innerHTML = '🎉 НОВЫЙ РЕКОРД!<br><span style="font-size:15px;font-weight:500;">' + lines.join('<br>') + '</span>';
     banner.classList.add('show');
     if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 200]);
     if (prBannerTimer) clearTimeout(prBannerTimer);
@@ -1916,6 +1972,34 @@ function showPRBanner(prs) {
         banner.classList.remove('show');
         prBannerTimer = null;
     }, 5000);
+
+    content.classList.remove('pr-shake');
+    void content.offsetWidth;
+    content.classList.add('pr-shake');
+
+    const anchor = content.querySelector('.pr-num');
+    if (anchor) spawnChalkDust(anchor);
+}
+
+function spawnChalkDust(anchorEl) {
+    const rect = anchorEl.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const count = 6 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < count; i++) {
+        const p = document.createElement('div');
+        p.className = 'pr-chalk';
+        p.style.left = cx + 'px';
+        p.style.top = cy + 'px';
+        const dx = (Math.random() * 60 - 30);
+        const dy = (Math.random() * 20 + 24);
+        p.style.setProperty('--dx', dx + 'px');
+        p.style.setProperty('--dy', dy + 'px');
+        document.body.appendChild(p);
+        const cleanup = () => { p.remove(); };
+        p.addEventListener('animationend', cleanup, { once: true });
+        setTimeout(cleanup, 800);
+    }
 }
 
 let bodyWeightChartInstance = null;
