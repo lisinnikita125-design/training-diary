@@ -879,7 +879,7 @@ async function doRegister() {
     const resp = await fetch('/register', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({email: email, password: pwd, name: name})
+        body: JSON.stringify({email: email, password: pwd, name: name, invite: pendingInviteCode})
     });
     const data = await resp.json();
     if (resp.ok) {
@@ -1076,12 +1076,18 @@ window.addEventListener('unhandledrejection', function(e) {
     showToast('Ошибка соединения с сервером', true);
 });
 
+// Код приглашения тренера из ссылки /register?invite=<code> — читается один раз
+// при загрузке страницы и передаётся в /register при отправке формы регистрации.
+const pendingInviteCode = new URLSearchParams(location.search).get('invite') || '';
+
 window.onload = async () => {
     await registerSW();
     const resp = await fetch('/check-auth');
     const data = await resp.json();
     if (data.auth) {
         await initApp();
+    } else if (pendingInviteCode) {
+        showBox('register');
     }
 };
 
@@ -2514,6 +2520,7 @@ function adminButtons(u) {
 async function showAdmin() {
     document.getElementById('settingsMenu').classList.add('hidden');
     document.getElementById('adminModal').style.display = 'flex';
+    document.getElementById('inviteLinkBox').style.display = 'none';
     const resp = await fetch('/admin/users');
     if (!resp.ok) { alert('Нет доступа'); return; }
     const data = await resp.json();
@@ -2566,6 +2573,24 @@ async function deleteUser(id, email) {
     const d = await resp.json();
     if (resp.ok) showAdmin();
     else alert(d.message);
+}
+
+async function createInvite() {
+    const resp = await fetch('/admin/invite', {method: 'POST'});
+    const d = await resp.json();
+    if (!resp.ok) { alert(d.message || 'Не удалось создать приглашение'); return; }
+    document.getElementById('inviteLinkText').textContent = d.invite_url;
+    document.getElementById('inviteLinkBox').style.display = 'flex';
+}
+
+async function copyInviteLink() {
+    const text = document.getElementById('inviteLinkText').textContent;
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast('Ссылка скопирована');
+    } catch (e) {
+        alert(text);
+    }
 }
 
 async function checkAdminAccess() {
@@ -2712,6 +2737,20 @@ async function loadAchievementsTab() {
 <div id="adminModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto;padding:20px;">
     <div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:500px;margin:0 auto;display:flex;flex-direction:column;gap:12px;">
         <h3 style="margin:0;color:var(--text)">🛡️ Панель админа</h3>
+        <button class="btn-secondary" onclick="createInvite()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <i class="ti ti-user-plus" aria-hidden="true"></i> Пригласить подопечного
+        </button>
+        <div id="inviteLinkBox" style="display:none;flex-direction:column;gap:8px;">
+            <div class="divider" style="margin:0;"></div>
+            <div class="ws-label">Ссылка-приглашение (одноразовая)</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span id="inviteLinkText" style="flex:1;font-size:14px;color:var(--text);word-break:break-all;"></span>
+                <button onclick="copyInviteLink()" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:20px;padding:4px;flex-shrink:0;" title="Копировать ссылку">
+                    <i class="ti ti-copy" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="divider" style="margin:0;"></div>
+        </div>
         <div id="adminUsersList"></div>
         <button class="btn-secondary" onclick="document.getElementById('adminModal').style.display='none'">✕ Закрыть</button>
     </div>
