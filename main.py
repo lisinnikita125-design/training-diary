@@ -482,11 +482,12 @@ def change_password():
 @app.route("/body-weight", methods=["GET"])
 def get_body_weight():
     require_auth()
+    uid = resolve_target_uid()
     conn = get_db()
     rows = conn.execute("""
         SELECT log_date, weight_kg, notes FROM body_weight
         WHERE user_id = ? ORDER BY log_date DESC LIMIT 30
-    """, (current_user_id(),)).fetchall()
+    """, (uid,)).fetchall()
     conn.close()
     return jsonify({"history": [dict(r) for r in rows]})
 
@@ -514,12 +515,13 @@ def save_body_weight():
 @app.route("/measurements", methods=["GET"])
 def get_measurements():
     require_auth()
+    uid = resolve_target_uid()
     conn = get_db()
     rows = conn.execute("""
         SELECT log_date, chest_cm, waist_cm, hips_cm, shoulder_cm, bicep_cm, notes
         FROM body_measurements
         WHERE user_id = ? ORDER BY log_date DESC LIMIT 20
-    """, (current_user_id(),)).fetchall()
+    """, (uid,)).fetchall()
     conn.close()
     return jsonify({"history": [dict(r) for r in rows]})
 
@@ -947,6 +949,7 @@ def workout_stats():
 @app.route("/compare")
 def compare_workouts():
     require_auth()
+    uid = resolve_target_uid()
     date1 = request.args.get("date1", "").strip()
     date2 = request.args.get("date2", "").strip()
     if not date1 or not date2:
@@ -955,7 +958,6 @@ def compare_workouts():
     cur = conn.cursor()
 
     def get_day_data(date):
-        uid = current_user_id()
         rows = cur.execute("""
             SELECT e.name, wl.set_number, wl.weight, wl.reps, wl.difficulty
             FROM workout_log wl
@@ -1000,9 +1002,9 @@ def compare_workouts():
 def workout_dates():
     """Даты тренировок сгруппированные по дням (День 1/2/3)."""
     require_auth()
+    uid = resolve_target_uid()
     conn = get_db()
     cur = conn.cursor()
-    uid = current_user_id()
     rows = cur.execute("""
         SELECT DISTINCT wl.workout_date, e.day_id
         FROM workout_log wl
@@ -1145,9 +1147,9 @@ def get_exercise_names():
 @app.route("/stats-summary")
 def stats_summary():
     require_auth()
+    uid = resolve_target_uid()
     conn = get_db()
     cur = conn.cursor()
-    uid = current_user_id()
     total = cur.execute(
         "SELECT COUNT(DISTINCT workout_date) FROM workout_log WHERE user_id = ?", (uid,)
     ).fetchone()[0]
@@ -2042,10 +2044,10 @@ def load_demo():
 def workout_history():
     """Список всех тренировок с деталями."""
     require_auth()
+    uid = resolve_target_uid()
     conn = get_db()
     cur = conn.cursor()
     # Получаем все уникальные даты с day_id
-    uid = current_user_id()
     dates = cur.execute("""
         SELECT DISTINCT wl.workout_date, e.day_id, dt.name as day_name
         FROM workout_log wl
@@ -2060,7 +2062,7 @@ def workout_history():
     for d in dates:
         # Получаем упражнения за этот день
         sets = cur.execute("""
-            SELECT e.name, wl.set_number, wl.weight, wl.reps, wl.difficulty,
+            SELECT e.name, wl.set_number, wl.weight, wl.reps, wl.difficulty, wl.notes,
                    0 as ex_tonnage,
                    (SELECT MAX(duration_seconds) FROM workout_log
                     WHERE workout_date = ? AND user_id = ?) as duration_seconds
@@ -2072,6 +2074,7 @@ def workout_history():
         """, (d["workout_date"], uid, d["workout_date"], d["day_id"], uid)).fetchall()
 
         total_tonnage = sum(r["weight"] * r["reps"] for r in sets)
+        note = next((r["notes"] for r in sets if r["notes"]), None)
 
         # Группируем по упражнению
         exercises = {}
@@ -2089,7 +2092,8 @@ def workout_history():
             "date": d["workout_date"],
             "day_name": d["day_name"],
             "total_tonnage": round(total_tonnage),
-            "exercises": exercises
+            "exercises": exercises,
+            "note": note
         })
 
     conn.close()
