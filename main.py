@@ -330,6 +330,32 @@ def current_user_id():
     return session.get("user_id")
 
 
+def resolve_target_uid():
+    """
+    Возвращает id пользователя, чьи данные нужно вернуть: обычно свой,
+    но если в запросе есть параметр user_id, отличный от своего, и
+    текущий пользователь — админ, возвращает запрошенный (после проверки,
+    что такой пользователь существует). Иначе 403/404.
+    """
+    uid = current_user_id()
+    requested = request.args.get("user_id", type=int)
+    if requested is None or requested == uid:
+        return uid
+
+    conn = get_db()
+    admin_row = conn.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
+    if not admin_row or not admin_row["is_admin"]:
+        conn.close()
+        abort(403)
+
+    target = conn.execute("SELECT id FROM users WHERE id=?", (requested,)).fetchone()
+    conn.close()
+    if not target:
+        abort(404, description="Пользователь не найден")
+
+    return requested
+
+
 # ══════════════════════════════════════════════
 #  БЭКАП
 # ══════════════════════════════════════════════
@@ -1187,7 +1213,7 @@ def progress_summary():
     упражнений за тот же период — всё пересчитывается на смену периода.
     """
     require_auth()
-    uid = current_user_id()
+    uid = resolve_target_uid()
     period = request.args.get("period", "3m")
     days = PROGRESS_PERIOD_DAYS.get(period, PROGRESS_PERIOD_DAYS["3m"])
 
@@ -1608,7 +1634,7 @@ def check_pr():
 @app.route("/prs")
 def get_prs():
     require_auth()
-    uid = current_user_id()
+    uid = resolve_target_uid()
     conn = get_db()
     rows = conn.execute("""
         SELECT e.name, MAX(wl.weight) as weight, MAX(wl.workout_date) as date
@@ -1626,7 +1652,7 @@ def get_prs():
 @app.route("/achievements")
 def get_achievements():
     require_auth()
-    uid = current_user_id()
+    uid = resolve_target_uid()
     conn = get_db()
     from datetime import date, timedelta
     from collections import defaultdict
