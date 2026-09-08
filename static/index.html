@@ -645,6 +645,7 @@
                     <button class="btn-primary btn-sm" onclick="saveBodyWeight()">Сохранить</button>
                 </div>
                 <canvas id="bodyWeightChart" height="120" style="margin-bottom:8px;"></canvas>
+                <div id="bodyWeightEmpty" class="hidden" style="font-size:15px;color:var(--text2);padding:12px 0;">Нет данных о весе</div>
             </div>
 
             <!-- Замеры тела -->
@@ -685,6 +686,7 @@
                 </div>
             </div>
 <canvas id="weeklyChart" height="160" style="margin-top:20px;"></canvas>
+<div id="weeklyEmpty" class="hidden" style="font-size:15px;color:var(--text2);padding:12px 0;margin-top:20px;">Нет данных за последние недели</div>
         </div>
     </div>
         <!-- ═══ ДОСТИЖЕНИЯ ═══ -->
@@ -2247,11 +2249,19 @@ async function saveBodyWeight() {
 }
 
 async function loadBodyWeight() {
+    const canvas = document.getElementById('bodyWeightChart');
+    const empty = document.getElementById('bodyWeightEmpty');
     try {
         const data = await fetch(withViewingParam('/body-weight')).then(r => r.json());
-        if (!data.history || data.history.length === 0) return;
-        const canvas = document.getElementById('bodyWeightChart');
+        if (!data.history || data.history.length === 0) {
+            if (bodyWeightChartInstance) { bodyWeightChartInstance.destroy(); bodyWeightChartInstance = null; }
+            if (canvas) canvas.classList.add('hidden');
+            if (empty) empty.classList.remove('hidden');
+            return;
+        }
         if (!canvas) return;
+        if (empty) empty.classList.add('hidden');
+        canvas.classList.remove('hidden');
         const labels = data.history.map(r => r.log_date).reverse();
         const values = data.history.map(r => r.weight_kg).reverse();
         if (bodyWeightChartInstance) bodyWeightChartInstance.destroy();
@@ -2316,12 +2326,18 @@ async function loadMeasurements() {
         if (!list) return;
         if (!data.history || data.history.length === 0) {
             list.innerHTML = '<div style="font-size:15px;color:var(--text2);">Замеров пока нет</div>';
+            measHistoryData = [];
+            if (measChartInstance) { measChartInstance.destroy(); measChartInstance = null; }
+            document.getElementById('measurementsChartBlock').classList.add('hidden');
             return;
         }
         measHistoryData = data.history;
         if (data.history.length >= 2) {
             document.getElementById('measurementsChartBlock').classList.remove('hidden');
             drawMeasChart(currentMeasField);
+        } else {
+            if (measChartInstance) { measChartInstance.destroy(); measChartInstance = null; }
+            document.getElementById('measurementsChartBlock').classList.add('hidden');
         }
         list.innerHTML = data.history.map(r => {
             const parts = [];
@@ -2403,8 +2419,12 @@ async function loadStats() {
     document.getElementById('statMonth').textContent = data.this_month;
     document.getElementById('statStreak').textContent = data.streak_weeks;
     document.getElementById('statTonnage').textContent = (data.month_tonnage/1000).toFixed(1);
+    const weeklyCanvas = document.getElementById('weeklyChart');
+    const weeklyEmpty = document.getElementById('weeklyEmpty');
     if (data.weekly?.length > 0) {
         if (weeklyChartInstance) weeklyChartInstance.destroy();
+        if (weeklyEmpty) weeklyEmpty.classList.add('hidden');
+        weeklyCanvas.classList.remove('hidden');
         function weekLabel(w) {
             const [year, week] = w.split('-').map(Number);
             const jan4 = new Date(year, 0, 4);
@@ -2415,10 +2435,14 @@ async function loadStats() {
             const fmt = d => d.getDate() + ' ' + ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()];
             return fmt(startOfWeek) + '–' + fmt(endOfWeek);
         }
-        weeklyChartInstance = new Chart(document.getElementById('weeklyChart').getContext('2d'), {
+        weeklyChartInstance = new Chart(weeklyCanvas.getContext('2d'), {
             type:'bar', data:{labels:data.weekly.map(w=>weekLabel(w.week)), datasets:[{label:'Тоннаж (кг)', data:data.weekly.map(w=>w.tonnage), backgroundColor:'rgba(46,125,50,0.7)', borderRadius:6}]},
             options:{responsive:true, plugins:{legend:{display:false}, title:{display:true, text:'Тоннаж по неделям'}}, scales:{y:{beginAtZero:true}}}
         });
+    } else {
+        if (weeklyChartInstance) { weeklyChartInstance.destroy(); weeklyChartInstance = null; }
+        weeklyCanvas.classList.add('hidden');
+        if (weeklyEmpty) weeklyEmpty.classList.remove('hidden');
     }
 
 }
