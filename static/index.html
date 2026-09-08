@@ -384,7 +384,7 @@
             </div>
         </div>
         <div style="display:flex;gap:6px;">
-            <button class="theme-toggle" onclick="showProfileScreen()" style="font-size:15px;padding:6px 10px;" title="Профиль">⚙️</button>
+            <button class="theme-toggle" onclick="showProfileScreen()" style="font-size:15px;padding:6px 10px;display:flex;align-items:center;" title="Профиль"><i class="ti ti-settings" aria-hidden="true" style="font-size:18px;line-height:1;"></i></button>
         </div>
     </div>
 
@@ -398,23 +398,23 @@
     ">
         <div style="padding:8px 0;">
             <button id="adminMenuBtn" onclick="showAdmin()" style="display:none;width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text);align-items:center;gap:10px;">
-                🛡️ Админ
+                <i class="ti ti-shield" aria-hidden="true" style="font-size:18px;line-height:1;color:var(--text2);"></i> Админ
             </button>
             <button onclick="showProfile()" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text);display:flex;align-items:center;gap:10px;">
-                👤 Профиль
+                <i class="ti ti-user" aria-hidden="true" style="font-size:18px;line-height:1;color:var(--text2);"></i> Профиль
             </button>
             <button onclick="showDayManager()" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text);display:flex;align-items:center;gap:10px;">
-                🏋️ Дни и упражнения
+                <i class="ti ti-barbell" aria-hidden="true" style="font-size:18px;line-height:1;color:var(--text2);"></i> Дни и упражнения
             </button>
             <button onclick="doLogout()" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text);display:flex;align-items:center;gap:10px;">
-                🚪 Выйти
+                <i class="ti ti-logout" aria-hidden="true" style="font-size:18px;line-height:1;color:var(--text2);"></i> Выйти
             </button>
             <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-            <button onclick="loadDemoData()" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--green);display:flex;align-items:center;gap:10px;">
-                🎯 Загрузить демо-данные
+            <button onclick="loadDemoData()" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text2);display:flex;align-items:center;gap:10px;">
+                <i class="ti ti-target" aria-hidden="true" style="font-size:18px;line-height:1;color:var(--text2);"></i> Загрузить демо-данные
             </button>
             <button onclick="restoreMyData()" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text);display:flex;align-items:center;gap:10px;">
-                ↩️ Восстановить мои данные
+                <i class="ti ti-rotate" aria-hidden="true" style="font-size:18px;line-height:1;color:var(--text2);"></i> Восстановить мои данные
             </button>
         </div>
     </div>
