@@ -455,6 +455,11 @@
         </div>
     </div>
 
+    <div id="viewingBanner" style="display:none;background:var(--gl);border-radius:10px;padding:10px 14px;margin:0 0 12px;align-items:center;justify-content:space-between;gap:10px;">
+        <span style="font-size:15px;color:var(--text);font-weight:600;">👀 Смотришь: <span id="viewingBannerName"></span></span>
+        <button onclick="exitViewingUser()" style="background:none;border:none;color:var(--green);font-size:15px;font-weight:600;cursor:pointer;padding:4px 0;">← Назад</button>
+    </div>
+
     <div class="nav-tabs">
         <button class="nav-tab active" onclick="showTab('workout')" aria-label="Тренировка"><i class="ti ti-barbell" aria-hidden="true"></i></button>
         <button class="nav-tab" onclick="showTab('history')" aria-label="История"><i class="ti ti-history" aria-hidden="true"></i></button>
@@ -538,8 +543,7 @@
     <!-- ═══ ПРОГРЕСС ═══ -->
     <div id="tab-progress" class="hidden">
         <div id="progressScreen">
-            <button id="progressBackBtn" class="hidden" onclick="exitUserProgressView()" style="background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;padding:4px 0;">← Назад к списку</button>
-            <div class="progress-title" id="progressTitleText">Прогресс</div>
+            <div class="progress-title">Прогресс</div>
             <div class="ws-label" style="margin-top:10px;">Последние</div>
             <div class="period-tabs">
                 <button class="period-tab" data-period="1m" onclick="setProgressPeriod('1m')">1М</button>
@@ -1249,11 +1253,15 @@ async function startSuggestedWorkout() {
 // ══════════════════════════════════════════════
 //  ИСТОРИЯ ТРЕНИРОВОК
 // ══════════════════════════════════════════════
+function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
 async function loadWorkoutHistory() {
     const container = document.getElementById('historyList');
     container.innerHTML = '<div style="text-align:center;color:var(--text2);padding:20px;">Загрузка...</div>';
     try {
-        const data = await fetch('/workout-history').then(r => r.json());
+        const data = await fetch(withViewingParam('/workout-history')).then(r => r.json());
         if (!data.history || data.history.length === 0) {
             container.innerHTML = '<div style="text-align:center;color:var(--text2);padding:20px;">Тренировок пока нет</div>';
             return;
@@ -1284,6 +1292,7 @@ async function loadWorkoutHistory() {
                         <button onclick="deleteWorkoutByDate('${w.date}')" style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:#c62828;" title="Удалить тренировку">🗑️</button>
                     </div>
                 </div>
+                ${w.note ? `<div style="padding:0 16px 12px;font-size:15px;color:var(--text2);">📝 ${escapeHtml(w.note)}</div>` : ''}
                 <div id="hist-detail-${idx}" class="hidden" style="border-top:1px solid var(--border);">
                     <div style="overflow-x:auto;">
                         <table style="width:100%;border-collapse:collapse;">
@@ -1318,6 +1327,7 @@ function showTab(name) {
     document.querySelectorAll('.nav-tab').forEach((btn, i) => {
         btn.classList.toggle('active', ['workout','history','achievements','progress','compare','stats'][i] === name);
     });
+    updateViewingBanner();
     if (name === 'stats') loadStats();
     if (name === 'compare') loadCompareDates();
     if (name === 'history') loadWorkoutHistory();
@@ -1789,19 +1799,32 @@ function setProgressPeriod(period) {
     loadProgress();
 }
 
-function updateProgressTitle() {
-    document.getElementById('progressTitleText').textContent = viewingUserId ? `Прогресс: ${viewingUserName}` : 'Прогресс';
-    document.getElementById('progressBackBtn').classList.toggle('hidden', !viewingUserId);
+// ══════════════════════════════════════════════
+//  ПРОСМОТР ЧУЖИХ ДАННЫХ (админ)
+// ══════════════════════════════════════════════
+function withViewingParam(url) {
+    if (!viewingUserId) return url;
+    const [path, query] = url.split('?');
+    const qs = new URLSearchParams(query || '');
+    qs.set('user_id', viewingUserId);
+    return `${path}?${qs}`;
 }
 
-function exitUserProgressView() {
+function updateViewingBanner() {
+    const banner = document.getElementById('viewingBanner');
+    const onWorkoutTab = !document.getElementById('tab-workout').classList.contains('hidden');
+    banner.style.display = (viewingUserId && !onWorkoutTab) ? 'flex' : 'none';
+    if (viewingUserId) document.getElementById('viewingBannerName').textContent = viewingUserName;
+}
+
+function exitViewingUser() {
     viewingUserId = null;
     viewingUserName = null;
-    updateProgressTitle();
+    updateViewingBanner();
     showAdmin();
 }
 
-function viewUserProgress(id) {
+function viewUserData(id) {
     const u = adminUsersCache.find(x => x.id === id);
     viewingUserId = id;
     viewingUserName = (u && (u.name || u.email)) || '';
@@ -1812,7 +1835,6 @@ function viewUserProgress(id) {
 async function loadProgress() {
     const strengthEl = document.getElementById('strengthIndexVal');
     strengthEl.textContent = '…';
-    updateProgressTitle();
     try {
         const qs = new URLSearchParams({period: progressPeriod});
         if (viewingUserId) qs.set('user_id', viewingUserId);
@@ -1945,7 +1967,7 @@ function renderProgressExercises() {
 //  СРАВНЕНИЕ
 // ══════════════════════════════════════════════
 async function loadCompareDates() {
-    const data = await (await fetch('/workout-dates')).json();
+    const data = await (await fetch(withViewingParam('/workout-dates'))).json();
     const dayNames = {'1': 'День 1 – ВЕРХ', '2': 'День 2 – НОГИ', '3': 'День 3 – ВЕРХ (плечи)'};
 
     // Заполняем селект дней
@@ -1982,7 +2004,7 @@ async function loadComparison() {
     const date1 = document.getElementById('compareDate1').value;
     const date2 = document.getElementById('compareDate2').value;
     if (date1 === date2) { showToast('Выберите разные даты', true); return; }
-    const data = await (await fetch(`/compare?date1=${date1}&date2=${date2}`)).json();
+    const data = await (await fetch(withViewingParam(`/compare?date1=${date1}&date2=${date2}`))).json();
     document.getElementById('compareHead1').textContent = date1;
     document.getElementById('compareHead2').textContent = date2;
     const tbody = document.getElementById('compareBody');
@@ -2222,7 +2244,7 @@ async function saveBodyWeight() {
 
 async function loadBodyWeight() {
     try {
-        const data = await fetch('/body-weight').then(r => r.json());
+        const data = await fetch(withViewingParam('/body-weight')).then(r => r.json());
         if (!data.history || data.history.length === 0) return;
         const canvas = document.getElementById('bodyWeightChart');
         if (!canvas) return;
@@ -2285,7 +2307,7 @@ async function saveMeasurements() {
 
 async function loadMeasurements() {
     try {
-        const data = await fetch('/measurements').then(r => r.json());
+        const data = await fetch(withViewingParam('/measurements')).then(r => r.json());
         const list = document.getElementById('measurementsList');
         if (!list) return;
         if (!data.history || data.history.length === 0) {
@@ -2368,7 +2390,7 @@ function showBadgeDetail(name, desc, date, earned) {
 //  СТАТИСТИКА
 // ══════════════════════════════════════════════
 async function loadStats() {
-    const data = await (await fetch('/stats-summary')).json();
+    const data = await (await fetch(withViewingParam('/stats-summary'))).json();
     checkReminder();
     renderCalendar();
     loadBodyWeight();
@@ -2470,7 +2492,7 @@ async function showAdmin() {
     adminUsersCache = data.users;
     const list = document.getElementById('adminUsersList');
     list.innerHTML = data.users.map(u => `
-        <div onclick="viewUserProgress(${u.id})" style="background:var(--bg);border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
+        <div onclick="viewUserData(${u.id})" style="background:var(--bg);border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
             <div>
                 <div style="font-weight:600;font-size:15px;color:var(--text)">${u.name || 'Без имени'} ${u.is_admin ? '👑' : ''}</div>
                 <div style="font-size:15px;color:var(--text2)">${u.email}</div>
@@ -2559,7 +2581,7 @@ async function loadAchievementsTab() {
   if (!grid) return;
   grid.innerHTML = '<p style="color:var(--text2);font-size:15px">Загрузка...</p>';
   try {
-    const r = await fetch('/achievements');
+    const r = await fetch(withViewingParam('/achievements'));
     const d = await r.json();
     if (d.status !== 'ok') throw new Error(d.message || 'Ошибка');
 
