@@ -1219,6 +1219,9 @@ def progress_summary():
     first_window_end_s = first_window_end.isoformat()
     last_window_start_s = last_window_start.isoformat()
 
+    debug_on = request.args.get("debug") == "1"
+    debug_exercises = []
+
     exercises_out = []
     # Медиана вместо среднего — устойчивее к единичной аномальной сессии
     # (разгрузка/техническая тренировка), случайно попавшей в узкое
@@ -1232,12 +1235,36 @@ def progress_summary():
         last_vals = [v for d, v in e1rm_by_date.items() if d > last_window_start_s]
 
         delta_pct = None
+        skip_reason = None
+        if not first_vals:
+            skip_reason = "no_sessions_in_first_window"
+        elif not last_vals:
+            skip_reason = "no_sessions_in_last_window"
+
+        baseline_med = final_med = None
         if first_vals and last_vals:
             baseline_med = statistics.median(first_vals)
             final_med = statistics.median(last_vals)
             if baseline_med > 0:
                 delta_pct = (final_med - baseline_med) / baseline_med * 100
                 qualifying[name] = {"baseline_med": baseline_med, "pct": delta_pct}
+            else:
+                skip_reason = "baseline_zero"
+
+        if debug_on:
+            debug_exercises.append({
+                "name": name,
+                "sessions_total": len(dates_sorted),
+                "sessions_first_window": len(first_vals),
+                "sessions_last_window": len(last_vals),
+                "first_window_e1rms": [round(v, 1) for v in first_vals],
+                "last_window_e1rms": [round(v, 1) for v in last_vals],
+                "baseline_med": round(baseline_med, 1) if baseline_med is not None else None,
+                "final_med": round(final_med, 1) if final_med is not None else None,
+                "delta_pct": round(delta_pct, 1) if delta_pct is not None else None,
+                "qualifies": name in qualifying,
+                "skip_reason": skip_reason,
+            })
 
         exercises_out.append({
             "name": name,
@@ -1252,6 +1279,22 @@ def progress_summary():
     strength_index_pct = None
     if qualifying:
         strength_index_pct = round(statistics.median([v["pct"] for v in qualifying.values()]), 1)
+
+    if debug_on:
+        debug_payload = {
+            "period": period,
+            "days": days,
+            "period_start": period_start.isoformat(),
+            "period_end": period_end.isoformat(),
+            "first_window_end": first_window_end_s,
+            "last_window_start": last_window_start_s,
+            "total_exercises_seen": len(session_e1rm),
+            "qualifying_count": len(qualifying),
+            "qualifying_pcts": [round(v["pct"], 1) for v in qualifying.values()],
+            "strength_index_pct": strength_index_pct,
+            "exercises": debug_exercises,
+        }
+        logger.info("PROGRESS_DEBUG period=%s payload=%s", period, json.dumps(debug_payload, ensure_ascii=False))
 
     # ── Тренд-график: недельные бакеты, forward-fill по каждому
     #    квалифицированному упражнению, нормализация к его baseline_med.
@@ -1306,7 +1349,7 @@ def progress_summary():
                 records_count += 1
 
     conn.close()
-    return jsonify({
+    result = {
         "period": period,
         "period_start": period_start.isoformat(),
         "period_end": period_end.isoformat(),
@@ -1316,7 +1359,10 @@ def progress_summary():
         "tonnage_kg": round(tonnage_kg, 1),
         "records_count": records_count,
         "exercises": exercises_out
-    })
+    }
+    if debug_on:
+        result["debug"] = debug_payload
+    return jsonify(result)
 
 
 @app.route("/export-csv")
