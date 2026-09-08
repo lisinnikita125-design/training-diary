@@ -1967,8 +1967,12 @@ function renderProgressExercises() {
 //  СРАВНЕНИЕ
 // ══════════════════════════════════════════════
 async function loadCompareDates() {
-    const data = await (await fetch(withViewingParam('/workout-dates'))).json();
-    const dayNames = {'1': 'День 1 – ВЕРХ', '2': 'День 2 – НОГИ', '3': 'День 3 – ВЕРХ (плечи)'};
+    const [data, days] = await Promise.all([
+        fetch(withViewingParam('/workout-dates')).then(r => r.json()),
+        fetch(withViewingParam('/days'), {cache: 'no-store'}).then(r => r.json())
+    ]);
+    const dayNameById = {};
+    days.forEach(d => { dayNameById[String(d.id)] = d.name; });
 
     // Заполняем селект дней
     const daySelect = document.getElementById('compareDaySelect');
@@ -1976,7 +1980,7 @@ async function loadCompareDates() {
     Object.keys(data.by_day).forEach(dayId => {
         const o = document.createElement('option');
         o.value = dayId;
-        o.textContent = dayNames[dayId] || 'День ' + dayId;
+        o.textContent = dayNameById[dayId] || 'День ' + dayId;
         daySelect.appendChild(o);
     });
 
@@ -2041,7 +2045,7 @@ async function registerSW() {
 
 async function checkReminder() {
     try {
-        const data = await (await fetch('/check-reminder')).json();
+        const data = await (await fetch(withViewingParam('/check-reminder'))).json();
         const banner = document.getElementById('reminderBanner');
         if (data.should_remind && data.days_since !== null) {
             banner.classList.remove('hidden');
@@ -2096,7 +2100,7 @@ function maybeNotify(daysSince) {
 //  КАЛЕНДАРЬ ТРЕНИРОВОК
 // ══════════════════════════════════════════════
 async function renderCalendar() {
-    const data = await (await fetch('/last-workout-days')).json();
+    const data = await (await fetch(withViewingParam('/last-workout-days'))).json();
     const trainingDates = new Set(data.dates);
     const grid = document.getElementById('calendarGrid');
     if (!grid) return;
@@ -2621,7 +2625,7 @@ async function loadAchievementsTab() {
   const prsList = document.getElementById('prs-list');
   if (prsList) {
     try {
-      const r2 = await fetch('/prs');
+      const r2 = await fetch(withViewingParam('/prs'));
       const d2 = await r2.json();
       if (d2.status === 'ok' && d2.prs && d2.prs.length) {
         prsList.innerHTML = '<div style="display:flex;flex-direction:column;gap:8px">' +

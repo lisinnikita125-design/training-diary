@@ -590,7 +590,7 @@ def get_day(day_id):
 @app.route("/days", methods=["GET"])
 def get_days():
     require_auth()
-    uid = current_user_id()
+    uid = resolve_target_uid()
     conn = get_db()
     days = conn.execute("""
         SELECT DISTINCT d.id, d.name, d.sort_order, d.active
@@ -1446,9 +1446,9 @@ def export_csv():
 def check_reminder():
     """Проверяет сколько дней прошло с последней тренировки."""
     require_auth()
+    uid = resolve_target_uid()
     conn = get_db()
     cur = conn.cursor()
-    uid = current_user_id()
     last = cur.execute("""
         SELECT workout_date FROM workout_log
         WHERE user_id = ?
@@ -1470,9 +1470,9 @@ def check_reminder():
 def last_workout_days():
     """Возвращает дни недели последних тренировок для отображения в статистике."""
     require_auth()
+    uid = resolve_target_uid()
     conn = get_db()
     cur = conn.cursor()
-    uid = current_user_id()
     rows = cur.execute("""
         SELECT DISTINCT workout_date FROM workout_log
         WHERE user_id = ?
