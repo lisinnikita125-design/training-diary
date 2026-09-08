@@ -538,7 +538,8 @@
     <!-- ═══ ПРОГРЕСС ═══ -->
     <div id="tab-progress" class="hidden">
         <div id="progressScreen">
-            <div class="progress-title">Прогресс</div>
+            <button id="progressBackBtn" class="hidden" onclick="exitUserProgressView()" style="background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;padding:4px 0;">← Назад к списку</button>
+            <div class="progress-title" id="progressTitleText">Прогресс</div>
             <div class="ws-label" style="margin-top:10px;">Последние</div>
             <div class="period-tabs">
                 <button class="period-tab" data-period="1m" onclick="setProgressPeriod('1m')">1М</button>
@@ -717,6 +718,9 @@ let exerciseMeta = {};
 let progressPeriod = '3m';
 let progressData = null;
 let progressShowAll = false;
+let adminUsersCache = [];
+let viewingUserId = null;
+let viewingUserName = null;
 const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === '1';
 
 
@@ -1785,11 +1789,40 @@ function setProgressPeriod(period) {
     loadProgress();
 }
 
+function updateProgressTitle() {
+    document.getElementById('progressTitleText').textContent = viewingUserId ? `Прогресс: ${viewingUserName}` : 'Прогресс';
+    document.getElementById('progressBackBtn').classList.toggle('hidden', !viewingUserId);
+}
+
+function exitUserProgressView() {
+    viewingUserId = null;
+    viewingUserName = null;
+    updateProgressTitle();
+    showAdmin();
+}
+
+function viewUserProgress(id) {
+    const u = adminUsersCache.find(x => x.id === id);
+    viewingUserId = id;
+    viewingUserName = (u && (u.name || u.email)) || '';
+    document.getElementById('adminModal').style.display = 'none';
+    showTab('progress');
+}
+
 async function loadProgress() {
     const strengthEl = document.getElementById('strengthIndexVal');
     strengthEl.textContent = '…';
+    updateProgressTitle();
     try {
-        const data = await (await fetch(`/progress-summary?period=${progressPeriod}`)).json();
+        const qs = new URLSearchParams({period: progressPeriod});
+        if (viewingUserId) qs.set('user_id', viewingUserId);
+        const resp = await fetch(`/progress-summary?${qs}`);
+        if (!resp.ok) {
+            strengthEl.textContent = '—';
+            showToast('Не удалось загрузить прогресс', true);
+            return;
+        }
+        const data = await resp.json();
         progressData = data;
 
         strengthEl.textContent = data.strength_index_pct === null ? '—' :
@@ -2434,15 +2467,16 @@ async function showAdmin() {
     const resp = await fetch('/admin/users');
     if (!resp.ok) { alert('Нет доступа'); return; }
     const data = await resp.json();
+    adminUsersCache = data.users;
     const list = document.getElementById('adminUsersList');
     list.innerHTML = data.users.map(u => `
-        <div style="background:var(--bg);border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+        <div onclick="viewUserProgress(${u.id})" style="background:var(--bg);border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
             <div>
                 <div style="font-weight:600;font-size:15px;color:var(--text)">${u.name || 'Без имени'} ${u.is_admin ? '👑' : ''}</div>
                 <div style="font-size:15px;color:var(--text2)">${u.email}</div>
-                <div style="font-size:15px;color:var(--text2)">тренировок: ${u.workout_count} · ${(u.created_at||'').slice(0,10)}</div>
+                <div style="font-size:15px;color:var(--text2)">тренировок: ${u.workout_count} · последняя: ${u.last_workout_date || '—'} · ${(u.created_at||'').slice(0,10)}</div>
             </div>
-            ${adminButtons(u)}
+            <div onclick="event.stopPropagation()">${adminButtons(u)}</div>
         </div>
     `).join('');
 }
