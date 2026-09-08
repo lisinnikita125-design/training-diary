@@ -857,8 +857,9 @@ def log_workout():
     conn.close()
     try:
         backup_db()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"BACKUP_ERROR {str(e)}")
+        send_telegram(f"🔴 <b>Progressor Backup Error</b>\n{str(e)}")
     logger.info(f"WORKOUT_SAVED user_id={current_user_id()} date={data['date']} day={data['day_id']}")
     return jsonify({"status": "ok", "date": data["date"], "day_id": data["day_id"]})
 
@@ -1910,7 +1911,7 @@ def restore_backup():
         return jsonify({"status": "ok", "message": "Данные восстановлены"})
     except Exception as e:
         logger.error(f"RESTORE_ERROR user_id={current_user_id()} {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "Внутренняя ошибка сервера"}), 500
 
 
 @app.route("/load-demo", methods=["POST"])
@@ -2078,7 +2079,7 @@ def handle_exception(e):
     if hasattr(e, 'code') and e.code < 500:
         return e
     send_telegram(f"🔴 <b>Progressor Exception</b>\n{type(e).__name__}: {str(e)}")
-    return jsonify({"status": "error", "message": str(e)}), 500
+    return jsonify({"status": "error", "message": "Внутренняя ошибка сервера"}), 500
 
 
 if __name__ == "__main__":
