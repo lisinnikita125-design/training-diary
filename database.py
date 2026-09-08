@@ -236,35 +236,43 @@ def seed_user(user_id):
     """
     conn = get_db()
     cur = conn.cursor()
+    # BEGIN IMMEDIATE берёт write-lock сразу, до SELECT: конкурентный вызов
+    # seed_user() для того же user_id (другой воркер / повторный вызов)
+    # будет ждать этот лок и увидит уже засеянные данные при своей проверке.
+    cur.execute("BEGIN IMMEDIATE")
+    try:
+        # Идемпотентность: уже засеяно — выходим
+        existing = cur.execute(
+            "SELECT id FROM exercises WHERE user_id = ? LIMIT 1", (user_id,)
+        ).fetchone()
+        if existing:
+            conn.commit()
+            return
 
-    # Идемпотентность: уже засеяно — выходим
-    existing = cur.execute(
-        "SELECT id FROM exercises WHERE user_id = ? LIMIT 1", (user_id,)
-    ).fetchone()
-    if existing:
+        # Копируем системные упражнения для каждого дня
+        system_exercises = cur.execute(
+            "SELECT day_id, name, machine_model, plan_sets, plan_reps_range, "
+            "default_weight, rest_seconds, sort_order "
+            "FROM exercises WHERE user_id IS NULL ORDER BY day_id, sort_order"
+        ).fetchall()
+
+        for ex in system_exercises:
+            cur.execute(
+                "INSERT INTO exercises "
+                "(user_id, day_id, name, machine_model, plan_sets, plan_reps_range, "
+                "default_weight, rest_seconds, sort_order) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (user_id, ex["day_id"], ex["name"], ex["machine_model"],
+                 ex["plan_sets"], ex["plan_reps_range"], ex["default_weight"],
+                 ex["rest_seconds"], ex["sort_order"])
+            )
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         conn.close()
-        return
-
-    # Копируем системные упражнения для каждого дня
-    system_exercises = cur.execute(
-        "SELECT day_id, name, machine_model, plan_sets, plan_reps_range, "
-        "default_weight, rest_seconds, sort_order "
-        "FROM exercises WHERE user_id IS NULL ORDER BY day_id, sort_order"
-    ).fetchall()
-
-    for ex in system_exercises:
-        cur.execute(
-            "INSERT INTO exercises "
-            "(user_id, day_id, name, machine_model, plan_sets, plan_reps_range, "
-            "default_weight, rest_seconds, sort_order) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (user_id, ex["day_id"], ex["name"], ex["machine_model"],
-             ex["plan_sets"], ex["plan_reps_range"], ex["default_weight"],
-             ex["rest_seconds"], ex["sort_order"])
-        )
-
-    conn.commit()
-    conn.close()
 
 
 if __name__ == "__main__":
