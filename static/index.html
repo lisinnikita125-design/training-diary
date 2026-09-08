@@ -379,7 +379,7 @@
             </div>
         </div>
         <div style="display:flex;gap:6px;">
-            <button class="theme-toggle" onclick="showSettingsMenu()" style="font-size:15px;padding:6px 10px;" title="Меню">⚙️</button>
+            <button class="theme-toggle" onclick="showProfileScreen()" style="font-size:15px;padding:6px 10px;" title="Профиль">⚙️</button>
         </div>
     </div>
 
@@ -410,6 +410,42 @@
             </button>
             <button onclick="restoreMyData()" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text);display:flex;align-items:center;gap:10px;">
                 ↩️ Восстановить мои данные
+            </button>
+        </div>
+    </div>
+
+    <!-- Экран профиля -->
+    <div id="profileScreen" class="hidden" style="position:fixed;top:0;left:0;right:0;bottom:0;background:var(--bg);z-index:200;overflow-y:auto;">
+        <div style="max-width:860px;margin:0 auto;padding:12px;">
+            <button onclick="hideProfileScreen()" style="background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;padding:8px 0;">← Назад</button>
+
+            <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:16px 0 4px;">
+                <div id="profileAvatar" style="width:84px;height:84px;border-radius:50%;background:linear-gradient(135deg,#1E3346,#3C6E9E);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:white;">—</div>
+                <div id="profileScreenName" style="font-size:22px;font-weight:800;color:var(--text);margin-top:12px;">—</div>
+                <div id="profileScreenSince" style="font-size:14px;color:var(--text2);margin-top:2px;">—</div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="progress-stats-row">
+                <div class="progress-stat"><span class="num" id="profileTotalWorkouts">—</span><span class="lbl">тренировок всего</span></div>
+                <div class="progress-stat"><span class="num" id="profileTotalTonnage">—</span><span class="lbl">тоннаж всего</span></div>
+                <div class="progress-stat"><span class="num record" id="profileTotalRecords">—</span><span class="lbl">рекордов всего</span></div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="ws-label">Достижения</div>
+            <div id="profileAchScore" style="font-size:18px;font-weight:700;color:var(--text);margin-top:2px;">—</div>
+            <div style="height:6px;background:var(--border);border-radius:4px;margin-top:8px;overflow:hidden;">
+                <div id="profileAchBar" style="height:100%;width:0%;background:var(--green);border-radius:4px;transition:width .4s;"></div>
+            </div>
+
+            <div class="divider"></div>
+
+            <button onclick="showSettingsMenu()" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:none;border:none;padding:6px 0 16px;color:var(--text);font-size:16px;font-weight:600;cursor:pointer;">
+                <span>Настройки аккаунта</span>
+                <span style="color:var(--text2);">→</span>
             </button>
         </div>
     </div>
@@ -693,6 +729,46 @@ function showSettingsMenu() {
             document.removeEventListener('click', closeMenu);
         });
     }, 10);
+}
+
+const RU_MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+function formatMemberSince(createdAt) {
+    if (!createdAt) return '';
+    const d = new Date(String(createdAt).replace(' ', 'T'));
+    if (isNaN(d.getTime())) return '';
+    return 'С нами с ' + RU_MONTHS_GEN[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+async function showProfileScreen() {
+    document.getElementById('settingsMenu').classList.add('hidden');
+    document.getElementById('profileScreen').classList.remove('hidden');
+    try {
+        const [profile, allTime, ach] = await Promise.all([
+            fetch('/profile').then(r => r.json()),
+            fetch('/progress-summary?period=all').then(r => r.json()),
+            fetch('/achievements').then(r => r.json())
+        ]);
+
+        const displayName = profile.name || (profile.email || '').split('@')[0] || 'Пользователь';
+        document.getElementById('profileAvatar').textContent = displayName.charAt(0).toUpperCase();
+        document.getElementById('profileScreenName').textContent = displayName;
+        document.getElementById('profileScreenSince').textContent = formatMemberSince(profile.created_at);
+
+        document.getElementById('profileTotalWorkouts').textContent = allTime.workouts_count;
+        document.getElementById('profileTotalTonnage').textContent = formatTonnageK(allTime.tonnage_kg);
+        document.getElementById('profileTotalRecords').textContent = allTime.records_count;
+
+        if (ach.status === 'ok') {
+            document.getElementById('profileAchScore').textContent = ach.earned + ' из ' + ach.total;
+            document.getElementById('profileAchBar').style.width = ach.score + '%';
+        }
+    } catch (e) {
+        showToast('Ошибка загрузки профиля', true);
+    }
+}
+
+function hideProfileScreen() {
+    document.getElementById('profileScreen').classList.add('hidden');
 }
 
 async function restoreMyData() {
