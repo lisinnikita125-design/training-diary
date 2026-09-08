@@ -525,6 +525,7 @@
             <div id="progressExList"></div>
             <input id="progressSearch" class="hidden" type="text" placeholder="Поиск упражнения..." oninput="renderProgressExercises()">
             <button class="progress-show-all" id="progressShowAllBtn" onclick="toggleProgressShowAll()">Показать все →</button>
+            <pre id="progressDebugOutput" class="hidden" style="white-space:pre-wrap; word-break:break-word; font-size:12px; line-height:1.5; color:var(--text2); background:var(--card); border:1px solid var(--border); border-radius:8px; padding:12px; margin-top:16px;"></pre>
         </div>
     </div>
 
@@ -675,6 +676,7 @@ let exerciseMeta = {};
 let progressPeriod = '3m';
 let progressData = null;
 let progressShowAll = false;
+const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === '1';
 
 
 
@@ -1235,7 +1237,7 @@ function showTab(name) {
     if (name === 'compare') loadCompareDates();
     if (name === 'history') loadWorkoutHistory();
     if (name === 'workout') loadWorkoutSummary();
-    if (name === 'progress') loadProgress();
+    if (name === 'progress') { loadProgress(); if (DEBUG_MODE) loadProgressDebug(); }
 }
 
 // ══════════════════════════════════════════════
@@ -1725,6 +1727,39 @@ async function loadProgress() {
         renderProgressExercises();
     } catch (e) {
         strengthEl.textContent = '—';
+    }
+}
+
+async function loadProgressDebug() {
+    const out = document.getElementById('progressDebugOutput');
+    out.classList.remove('hidden');
+    out.textContent = 'Загрузка debug-данных…';
+    const periods = ['1m', '3m', '6m', '1y'];
+    try {
+        const results = await Promise.all(periods.map(p =>
+            fetch(`/progress-summary?period=${p}&debug=1`).then(r => r.json())
+        ));
+        const lines = [];
+        periods.forEach((p, i) => {
+            const debug = results[i].debug || {};
+            lines.push(`══ Период: ${p} ══`);
+            lines.push(`strength_index_pct: ${debug.strength_index_pct}`);
+            lines.push(`qualifying: ${debug.qualifying_count}/${debug.total_exercises_seen}`);
+            lines.push('');
+            (debug.exercises || []).forEach(ex => {
+                lines.push(`• ${ex.name}`);
+                lines.push(`  sessions: total=${ex.sessions_total} first=${ex.sessions_first_window} last=${ex.sessions_last_window}`);
+                lines.push(`  baseline_med=${ex.baseline_med} final_med=${ex.final_med} delta_pct=${ex.delta_pct}`);
+                lines.push(`  qualifies=${ex.qualifies} skip_reason=${ex.skip_reason}`);
+                lines.push(`  first_window_e1rms: [${(ex.first_window_e1rms || []).join(', ')}]`);
+                lines.push(`  last_window_e1rms: [${(ex.last_window_e1rms || []).join(', ')}]`);
+                lines.push('');
+            });
+            if (!(debug.exercises || []).length) lines.push('(нет упражнений в периоде)', '');
+        });
+        out.textContent = lines.join('\n');
+    } catch (e) {
+        out.textContent = 'Ошибка загрузки debug-данных: ' + e;
     }
 }
 
