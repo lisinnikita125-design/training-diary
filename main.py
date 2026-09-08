@@ -45,6 +45,42 @@ def _seed_existing_users():
         seed_user(u["id"])
 _seed_existing_users()
 
+# Привязка "осиротевших" пользователей (без записи в coach_trainees) к единственному
+# существующему админу. Если админов больше одного — не угадываем, оставляем ручной кейс.
+def _migrate_orphan_trainees():
+    conn = get_db()
+    cur = conn.cursor()
+    orphans = cur.execute("""
+        SELECT u.id FROM users u
+        WHERE NOT EXISTS (SELECT 1 FROM coach_trainees ct WHERE ct.trainee_id = u.id)
+    """).fetchall()
+    if not orphans:
+        conn.close()
+        return
+
+    admins = cur.execute("SELECT id FROM users WHERE is_admin = 1").fetchall()
+    if len(admins) != 1:
+        conn.close()
+        logger.warning(
+            f"COACH_TRAINEES_MIGRATION_SKIPPED orphan_count={len(orphans)} admin_count={len(admins)} "
+            "— ожидался ровно один админ, миграция требует ручного вмешательства"
+        )
+        return
+
+    coach_id = admins[0]["id"]
+    orphan_ids = [o["id"] for o in orphans if o["id"] != coach_id]
+    if not orphan_ids:
+        conn.close()
+        return
+    for tid in orphan_ids:
+        cur.execute(
+            "INSERT OR IGNORE INTO coach_trainees (coach_id, trainee_id) VALUES (?, ?)",
+            (coach_id, tid)
+        )
+    conn.commit()
+    conn.close()
+    logger.info(f"COACH_TRAINEES_MIGRATION_APPLIED coach_id={coach_id} trainee_count={len(orphan_ids)}")
+
 import logging, os
 from logging.handlers import RotatingFileHandler
 
@@ -66,6 +102,8 @@ log_handler.setFormatter(logging.Formatter(
 logger = logging.getLogger('progressor')
 logger.setLevel(logging.INFO)
 logger.addHandler(log_handler)
+
+_migrate_orphan_trainees()
 
 def send_telegram(message):
     """Отправляет уведомление об ошибке на email (Telegram недоступен на free PythonAnywhere)."""
@@ -334,8 +372,9 @@ def resolve_target_uid():
     """
     Возвращает id пользователя, чьи данные нужно вернуть: обычно свой,
     но если в запросе есть параметр user_id, отличный от своего, и
-    текущий пользователь — админ, возвращает запрошенный (после проверки,
-    что такой пользователь существует). Иначе 403/404.
+    текущий пользователь — админ, возвращает запрошенный — но только если
+    запрошенный пользователь является подопечным именно этого админа
+    (запись в coach_trainees). Иначе 403/404.
     """
     uid = current_user_id()
     requested = request.args.get("user_id", type=int)
@@ -349,9 +388,16 @@ def resolve_target_uid():
         abort(403)
 
     target = conn.execute("SELECT id FROM users WHERE id=?", (requested,)).fetchone()
-    conn.close()
     if not target:
+        conn.close()
         abort(404, description="Пользователь не найден")
+
+    owns = conn.execute(
+        "SELECT 1 FROM coach_trainees WHERE coach_id=? AND trainee_id=?", (uid, requested)
+    ).fetchone()
+    conn.close()
+    if not owns:
+        abort(403)
 
     return requested
 
@@ -385,6 +431,19 @@ def require_admin():
     if not user or not user["is_admin"]:
         abort(403)
 
+
+def require_owns_trainee(user_id):
+    """Абортит 403, если у current_user_id() нет записи coach_trainees на этого user_id."""
+    conn = get_db()
+    owns = conn.execute(
+        "SELECT 1 FROM coach_trainees WHERE coach_id=? AND trainee_id=?",
+        (current_user_id(), user_id)
+    ).fetchone()
+    conn.close()
+    if not owns:
+        abort(403)
+
+
 @app.route("/admin/users")
 def admin_users():
     require_admin()
@@ -394,10 +453,11 @@ def admin_users():
                COUNT(DISTINCT wl.workout_date) as workout_count,
                MAX(wl.workout_date) as last_workout_date
         FROM users u
+        INNER JOIN coach_trainees ct ON ct.trainee_id = u.id AND ct.coach_id = ?
         LEFT JOIN workout_log wl ON wl.user_id = u.id AND wl.set_number > 0
         GROUP BY u.id
         ORDER BY u.created_at DESC
-    """).fetchall()
+    """, (current_user_id(),)).fetchall()
     conn.close()
     return jsonify({"users": [dict(u) for u in users]})
 
@@ -407,6 +467,7 @@ def admin_toggle_admin(user_id):
     require_admin()
     if user_id == current_user_id():
         return jsonify({"status": "error", "message": "Нельзя изменить свои права"}), 400
+    require_owns_trainee(user_id)
     conn = get_db()
     user = conn.execute("SELECT is_admin FROM users WHERE id=?", (user_id,)).fetchone()
     if not user:
@@ -423,6 +484,7 @@ def admin_delete_user(user_id):
     require_admin()
     if user_id == current_user_id():
         return jsonify({"status": "error", "message": "Нельзя удалить себя"}), 400
+    require_owns_trainee(user_id)
     conn = get_db()
     conn.execute("DELETE FROM workout_log WHERE user_id=?", (user_id,))
     conn.execute("DELETE FROM exercises WHERE user_id=?", (user_id,))
@@ -1878,6 +1940,7 @@ def get_achievements():
 @app.route("/admin/verify-user/<int:user_id>", methods=["POST"])
 def admin_verify_user(user_id):
     require_admin()
+    require_owns_trainee(user_id)
     conn = get_db()
     conn.execute("UPDATE users SET is_verified=1, verify_token=NULL WHERE id=?", (user_id,))
     conn.commit()

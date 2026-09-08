@@ -165,6 +165,20 @@ def init_db():
     except Exception:
         pass
 
+    # coach_trainees: связь тренер-подопечный (изоляция видимости админов).
+    # Без UNIQUE(trainee_id) — подопечный в будущем может иметь больше одного тренера.
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS coach_trainees (
+            coach_id INTEGER NOT NULL,
+            trainee_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (coach_id, trainee_id),
+            FOREIGN KEY (coach_id) REFERENCES users(id),
+            FOREIGN KEY (trainee_id) REFERENCES users(id)
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_coach_trainees_trainee ON coach_trainees(trainee_id)")
+
     conn.commit()
     conn.close()
 
