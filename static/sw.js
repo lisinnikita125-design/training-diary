@@ -31,7 +31,8 @@ self.addEventListener('fetch', event => {
         url.pathname.startsWith('/check') || url.pathname.startsWith('/last-weight') ||
         url.pathname.startsWith('/exercise') || url.pathname.startsWith('/workout') ||
         url.pathname.startsWith('/compare') || url.pathname.startsWith('/export') ||
-        url.pathname.startsWith('/login') || url.pathname.startsWith('/logout')) {
+        url.pathname.startsWith('/login') || url.pathname.startsWith('/logout') ||
+        url.pathname.startsWith('/body-weight') || url.pathname.startsWith('/measurements')) {
         return; // Не перехватываем API
     }
 
