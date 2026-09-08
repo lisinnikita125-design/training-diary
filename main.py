@@ -50,36 +50,46 @@ _seed_existing_users()
 def _migrate_orphan_trainees():
     conn = get_db()
     cur = conn.cursor()
-    orphans = cur.execute("""
-        SELECT u.id FROM users u
-        WHERE NOT EXISTS (SELECT 1 FROM coach_trainees ct WHERE ct.trainee_id = u.id)
-    """).fetchall()
-    if not orphans:
-        conn.close()
-        return
+    # BEGIN IMMEDIATE берёт write-lock сразу, до SELECT: тот же паттерн, что в
+    # seed_user() — конкурентный запуск этой функции в другом gunicorn-воркере
+    # при старте будет ждать этот лок и увидит уже применённую миграцию на своей
+    # проверке, вместо гонки "оба видят одних и тех же сирот и пишут параллельно".
+    cur.execute("BEGIN IMMEDIATE")
+    try:
+        orphans = cur.execute("""
+            SELECT u.id FROM users u
+            WHERE NOT EXISTS (SELECT 1 FROM coach_trainees ct WHERE ct.trainee_id = u.id)
+        """).fetchall()
+        if not orphans:
+            conn.commit()
+            return
 
-    admins = cur.execute("SELECT id FROM users WHERE is_admin = 1").fetchall()
-    if len(admins) != 1:
-        conn.close()
-        logger.warning(
-            f"COACH_TRAINEES_MIGRATION_SKIPPED orphan_count={len(orphans)} admin_count={len(admins)} "
-            "— ожидался ровно один админ, миграция требует ручного вмешательства"
-        )
-        return
+        admins = cur.execute("SELECT id FROM users WHERE is_admin = 1").fetchall()
+        if len(admins) != 1:
+            conn.commit()
+            logger.warning(
+                f"COACH_TRAINEES_MIGRATION_SKIPPED orphan_count={len(orphans)} admin_count={len(admins)} "
+                "— ожидался ровно один админ, миграция требует ручного вмешательства"
+            )
+            return
 
-    coach_id = admins[0]["id"]
-    orphan_ids = [o["id"] for o in orphans if o["id"] != coach_id]
-    if not orphan_ids:
+        coach_id = admins[0]["id"]
+        orphan_ids = [o["id"] for o in orphans if o["id"] != coach_id]
+        if not orphan_ids:
+            conn.commit()
+            return
+        for tid in orphan_ids:
+            cur.execute(
+                "INSERT OR IGNORE INTO coach_trainees (coach_id, trainee_id) VALUES (?, ?)",
+                (coach_id, tid)
+            )
+        conn.commit()
+        logger.info(f"COACH_TRAINEES_MIGRATION_APPLIED coach_id={coach_id} trainee_count={len(orphan_ids)}")
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         conn.close()
-        return
-    for tid in orphan_ids:
-        cur.execute(
-            "INSERT OR IGNORE INTO coach_trainees (coach_id, trainee_id) VALUES (?, ?)",
-            (coach_id, tid)
-        )
-    conn.commit()
-    conn.close()
-    logger.info(f"COACH_TRAINEES_MIGRATION_APPLIED coach_id={coach_id} trainee_count={len(orphan_ids)}")
 
 import logging, os
 from logging.handlers import RotatingFileHandler
