@@ -1163,6 +1163,10 @@ def stats_summary():
 #  ПРОГРЕСС — Индекс силы (e1RM)
 # ══════════════════════════════════════════════
 PROGRESS_PERIOD_DAYS = {"1m": 30, "3m": 90, "6m": 182, "1y": 365}
+# Медиана двух значений совпадает с их средним, так что при ровно 2 сессиях
+# в окне единичная аномальная тренировка (разгрузка/техника) искажает % как
+# и обычное среднее. Устойчивость появляется только от 3 сессий и выше.
+PROGRESS_MIN_WINDOW_SESSIONS = 3
 
 
 def _e1rm(weight, reps):
@@ -1225,7 +1229,8 @@ def progress_summary():
     exercises_out = []
     # Медиана вместо среднего — устойчивее к единичной аномальной сессии
     # (разгрузка/техническая тренировка), случайно попавшей в узкое
-    # 2-недельное окно.
+    # 2-недельное окно. Но при ровно 2 значениях медиана = среднему, поэтому
+    # ниже PROGRESS_MIN_WINDOW_SESSIONS сессий в окне % вообще не считаем.
     qualifying = {}  # name -> {baseline_med, pct}
     for name, e1rm_by_date in session_e1rm.items():
         dates_sorted = sorted(e1rm_by_date.keys())
@@ -1236,13 +1241,13 @@ def progress_summary():
 
         delta_pct = None
         skip_reason = None
-        if not first_vals:
-            skip_reason = "no_sessions_in_first_window"
-        elif not last_vals:
-            skip_reason = "no_sessions_in_last_window"
+        if len(first_vals) < PROGRESS_MIN_WINDOW_SESSIONS:
+            skip_reason = "insufficient_sessions_first_window"
+        elif len(last_vals) < PROGRESS_MIN_WINDOW_SESSIONS:
+            skip_reason = "insufficient_sessions_last_window"
 
         baseline_med = final_med = None
-        if first_vals and last_vals:
+        if len(first_vals) >= PROGRESS_MIN_WINDOW_SESSIONS and len(last_vals) >= PROGRESS_MIN_WINDOW_SESSIONS:
             baseline_med = statistics.median(first_vals)
             final_med = statistics.median(last_vals)
             if baseline_med > 0:
