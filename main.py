@@ -913,9 +913,13 @@ def update_day(day_id):
         conn.close()
         abort(404, description="День не найден")
 
+    # Унаследованные дни (созданные до появления owner_user_id) имеют owner_user_id=NULL,
+    # из-за чего d.owner_user_id=? в /days никогда не совпадает ни с одним uid. Если такой
+    # день лишают visibility='all', он становится невидимым вообще для всех, без возврата.
+    # Закрепляем владельца за тем, кто редактирует день, — но только если владельца ещё нет.
     cur.execute(
-        "UPDATE day_templates SET name=?, visibility=? WHERE id=?",
-        (name, visibility, day_id)
+        "UPDATE day_templates SET name=?, visibility=?, owner_user_id=COALESCE(owner_user_id, ?) WHERE id=?",
+        (name, visibility, current_user_id(), day_id)
     )
     cur.execute("DELETE FROM day_visibility WHERE day_id=?", (day_id,))
     if visibility == "custom":
