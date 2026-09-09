@@ -722,7 +722,8 @@ def get_days():
     uid = resolve_target_uid()
     conn = get_db()
     days = conn.execute("""
-        SELECT DISTINCT d.id, d.name, d.sort_order, d.active
+        SELECT DISTINCT d.id, d.name, d.sort_order, d.active,
+               (dv.user_id IS NOT NULL) AS assigned
         FROM day_templates d
         LEFT JOIN day_visibility dv ON dv.day_id = d.id AND dv.user_id = ?
         WHERE d.visibility = 'all'
@@ -938,10 +939,17 @@ def toggle_day_active(day_id):
     require_admin()
     conn = get_db()
     cur = conn.cursor()
-    day = cur.execute("SELECT active FROM day_templates WHERE id=?", (day_id,)).fetchone()
+    day = cur.execute("SELECT active, owner_user_id FROM day_templates WHERE id=?", (day_id,)).fetchone()
     if not day:
         conn.close()
         abort(404, description="День не найден")
+    # Дни с проставленным владельцем архивирует только сам владелец — архивация
+    # личная ("для себя"), а не глобальное решение любого админа. У "ничьих"
+    # унаследованных дней (owner_user_id=NULL) более узкого владельца нет,
+    # там оставляем прежнее поведение — любой админ.
+    if day["owner_user_id"] is not None and day["owner_user_id"] != current_user_id():
+        conn.close()
+        abort(403, description="Архивировать день может только его владелец")
     new_active = 0 if day["active"] else 1
     cur.execute("UPDATE day_templates SET active=? WHERE id=?", (new_active, day_id))
     conn.commit()
