@@ -168,6 +168,13 @@ def send_email(to, subject, body_html):
 #  АВТОРИЗАЦИЯ
 # ══════════════════════════════════════════════
 
+@app.route("/register", methods=["GET"])
+def register_page():
+    # Пригласительная ссылка тренера (/register?invite=<code>) должна открывать
+    # само приложение, а не 404/405 — код читает JS из query на клиенте.
+    return app.send_static_file("index.html")
+
+
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json() or {}
@@ -187,13 +194,48 @@ def register():
         conn.close()
         return jsonify({"status": "error", "message": "Email уже зарегистрирован"}), 409
 
+    # Код приглашения — опциональное дополнение к обычной регистрации.
+    # Невалидный/использованный код НЕ должен ломать регистрацию: просто
+    # игнорируем его и пользователь становится "осиротевшим", как если бы
+    # кода не было вовсе.
+    invite_code = (data.get("invite") or "").strip()
+    invite_coach_id = None
+    if invite_code:
+        invite_row = cur.execute(
+            "SELECT coach_id FROM coach_invites WHERE code = ? AND used_at IS NULL",
+            (invite_code,)
+        ).fetchone()
+        if invite_row:
+            invite_coach_id = invite_row["coach_id"]
+        else:
+            logger.warning(f"COACH_INVITE_INVALID code={invite_code}")
+
     token = secrets.token_urlsafe(32)
     cur.execute(
         "INSERT INTO users (email, password_hash, name, is_verified, verify_token) VALUES (?, ?, ?, 0, ?)",
         (email, generate_password_hash(password), name, token)
     )
-    conn.commit()
     user_id = cur.lastrowid
+
+    if invite_coach_id is not None:
+        # Атомарный "захват" кода: UPDATE ... WHERE used_at IS NULL гарантирует,
+        # что при гонке двух одновременных регистраций одним кодом только одна
+        # из них его застолбит — вторая станет обычной "осиротевшей" регистрацией.
+        claimed = cur.execute(
+            "UPDATE coach_invites SET used_at = CURRENT_TIMESTAMP, used_by = ? "
+            "WHERE code = ? AND used_at IS NULL",
+            (user_id, invite_code)
+        )
+        if claimed.rowcount == 1:
+            cur.execute(
+                "INSERT INTO coach_trainees (coach_id, trainee_id) VALUES (?, ?)",
+                (invite_coach_id, user_id)
+            )
+            logger.info(f"COACH_INVITE_USED code={invite_code} coach_id={invite_coach_id} trainee_id={user_id}")
+        else:
+            logger.warning(f"COACH_INVITE_RACE_LOST code={invite_code} user_id={user_id}")
+
+    conn.commit()
     conn.close()
 
     # Копируем системную программу новому пользователю
@@ -502,6 +544,21 @@ def admin_delete_user(user_id):
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
+
+
+@app.route("/admin/invite", methods=["POST"])
+def admin_create_invite():
+    require_admin()
+    code = secrets.token_urlsafe(32)
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO coach_invites (coach_id, code) VALUES (?, ?)",
+        (current_user_id(), code)
+    )
+    conn.commit()
+    conn.close()
+    logger.info(f"COACH_INVITE_CREATED coach_id={current_user_id()}")
+    return jsonify({"status": "ok", "invite_url": f"{APP_URL}/register?invite={code}"})
 
 # ══════════════════════════════════════════════
 #  ПРОФИЛЬ

@@ -179,6 +179,23 @@ def init_db():
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_coach_trainees_trainee ON coach_trainees(trainee_id)")
 
+    # coach_invites: одноразовые коды-приглашения, которыми тренер зовёт подопечного.
+    # code — как verify_token/reset_token (secrets.token_urlsafe(32)), используется
+    # ровно один раз: used_at IS NULL значит код ещё не активирован.
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS coach_invites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            coach_id INTEGER NOT NULL,
+            code TEXT NOT NULL UNIQUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            used_at TIMESTAMP,
+            used_by INTEGER,
+            FOREIGN KEY (coach_id) REFERENCES users(id),
+            FOREIGN KEY (used_by) REFERENCES users(id)
+        )
+    """)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_coach_invites_coach ON coach_invites(coach_id)")
+
     conn.commit()
     conn.close()
 
