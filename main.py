@@ -30,6 +30,7 @@ MAIL_USER     = getattr(_cfg, "MAIL_USER",     "")
 MAIL_PASSWORD = getattr(_cfg, "MAIL_PASSWORD", "")
 MAIL_FROM     = getattr(_cfg, "MAIL_FROM",     MAIL_USER)
 APP_URL       = getattr(_cfg, "APP_URL",       "https://nikitalisin.pythonanywhere.com")
+OWNER_EMAIL   = getattr(_cfg, "OWNER_EMAIL",   "")
 
 init_db()
 
@@ -181,6 +182,7 @@ def register():
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
     name = (data.get("name") or "").strip()
+    is_coach = bool(data.get("is_coach"))
 
     if not email or "@" not in email:
         return jsonify({"status": "error", "message": "Неверный email"}), 400
@@ -197,10 +199,11 @@ def register():
     # Код приглашения — опциональное дополнение к обычной регистрации.
     # Невалидный/использованный код НЕ должен ломать регистрацию: просто
     # игнорируем его и пользователь становится "осиротевшим", как если бы
-    # кода не было вовсе.
+    # кода не было вовсе. Самостоятельная регистрация тренера (is_coach) не
+    # обрабатывает инвайт вообще — тренер не становится чьим-то подопечным.
     invite_code = (data.get("invite") or "").strip()
     invite_coach_id = None
-    if invite_code:
+    if invite_code and not is_coach:
         invite_row = cur.execute(
             "SELECT coach_id FROM coach_invites WHERE code = ? AND used_at IS NULL",
             (invite_code,)
@@ -212,8 +215,8 @@ def register():
 
     token = secrets.token_urlsafe(32)
     cur.execute(
-        "INSERT INTO users (email, password_hash, name, is_verified, verify_token) VALUES (?, ?, ?, 0, ?)",
-        (email, generate_password_hash(password), name, token)
+        "INSERT INTO users (email, password_hash, name, is_verified, verify_token, is_admin) VALUES (?, ?, ?, 0, ?, ?)",
+        (email, generate_password_hash(password), name, token, 1 if is_coach else 0)
     )
     user_id = cur.lastrowid
 
@@ -234,6 +237,9 @@ def register():
             logger.info(f"COACH_INVITE_USED code={invite_code} coach_id={invite_coach_id} trainee_id={user_id}")
         else:
             logger.warning(f"COACH_INVITE_RACE_LOST code={invite_code} user_id={user_id}")
+
+    if is_coach:
+        logger.info(f"COACH_SELF_REGISTERED user_id={user_id} email={email}")
 
     conn.commit()
     conn.close()
@@ -317,10 +323,11 @@ def logout():
 def check_auth():
     if session.get("auth"):
         conn = get_db()
-        user = conn.execute("SELECT is_admin FROM users WHERE id=?", (current_user_id(),)).fetchone()
+        user = conn.execute("SELECT email, is_admin FROM users WHERE id=?", (current_user_id(),)).fetchone()
         conn.close()
         is_admin = bool(user and user["is_admin"])
-        return jsonify({"auth": True, "name": session.get("user_name", ""), "is_admin": is_admin})
+        is_owner = bool(user and OWNER_EMAIL and user["email"].lower() == OWNER_EMAIL.lower())
+        return jsonify({"auth": True, "name": session.get("user_name", ""), "is_admin": is_admin, "is_owner": is_owner})
     return jsonify({"auth": False})
 
 
@@ -496,6 +503,24 @@ def require_owns_trainee(user_id):
         abort(403)
 
 
+def require_owner():
+    """
+    Аварийный тормоз владельца приложения — определяется захардкоженным
+    OWNER_EMAIL в config.py, а не флагом в БД (см. обоснование в задаче:
+    единственный владелец, который не должен зависеть от переключаемых
+    через UI полей). is_admin=1 НЕ делает пользователя владельцем.
+    """
+    if not session.get("auth"):
+        abort(401)
+    if not OWNER_EMAIL:
+        abort(403)
+    conn = get_db()
+    user = conn.execute("SELECT email FROM users WHERE id=?", (current_user_id(),)).fetchone()
+    conn.close()
+    if not user or user["email"].lower() != OWNER_EMAIL.lower():
+        abort(403)
+
+
 @app.route("/admin/users")
 def admin_users():
     require_admin()
@@ -559,6 +584,48 @@ def admin_create_invite():
     conn.close()
     logger.info(f"COACH_INVITE_CREATED coach_id={current_user_id()}")
     return jsonify({"status": "ok", "invite_url": f"{APP_URL}/register?invite={code}"})
+
+
+# ══════════════════════════════════════════════
+#  ВЛАДЕЛЕЦ (аварийный тормоз)
+# ══════════════════════════════════════════════
+# Узкая возможность для владельца приложения: видеть всех тренеров и
+# отзывать статус у любого — без доступа к их подопечным/данным
+# (никакого джойна на coach_trainees/workout_log/body_weight и т.п.).
+
+@app.route("/owner/coaches")
+def owner_coaches():
+    require_owner()
+    conn = get_db()
+    coaches = conn.execute("""
+        SELECT id, email, name, created_at
+        FROM users
+        WHERE is_admin = 1
+        ORDER BY created_at DESC
+    """).fetchall()
+    conn.close()
+    return jsonify({"coaches": [dict(c) for c in coaches]})
+
+
+@app.route("/owner/revoke-coach/<int:user_id>", methods=["POST"])
+def owner_revoke_coach(user_id):
+    require_owner()
+    conn = get_db()
+    user = conn.execute("SELECT is_admin FROM users WHERE id=?", (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({"status": "error", "message": "Пользователь не найден"}), 404
+    if not user["is_admin"]:
+        conn.close()
+        return jsonify({"status": "error", "message": "Пользователь и так не тренер"}), 400
+    # Записи в coach_trainees НЕ трогаем: подопечные остаются привязаны,
+    # доступ восстановится сам, если статус вернут (см. задачу).
+    conn.execute("UPDATE users SET is_admin=0 WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
+    logger.info(f"OWNER_COACH_REVOKED owner_id={current_user_id()} user_id={user_id}")
+    return jsonify({"status": "ok"})
+
 
 # ══════════════════════════════════════════════
 #  ПРОФИЛЬ

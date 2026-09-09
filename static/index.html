@@ -360,6 +360,10 @@
         <input type="text" id="regName" placeholder="Имя (необязательно)">
         <input type="email" id="regEmail" placeholder="Email">
         <div style="position:relative;display:flex;align-items:center;" data-pw-wrapped="regPassword"><input type="password" id="regPassword" placeholder="Пароль (мин. 6 символов)" onkeydown="if(event.key==='Enter')doRegister()"><button type="button" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;padding:0;color:var(--text2);" onclick="togglePassword('regPassword',this)">👁</button></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:var(--text);padding:4px 2px;cursor:pointer;">
+            <input type="checkbox" id="regIsCoach" style="width:18px;height:18px;flex-shrink:0;">
+            Зарегистрироваться как тренер
+        </label>
         <button class="btn-primary" onclick="doRegister()">Создать аккаунт</button>
         <span id="registerError"></span>
         <button class="auth-link" onclick="showBox('login')">Уже есть аккаунт? Войти</button>
@@ -399,6 +403,9 @@
         <div style="padding:8px 0;">
             <button id="adminMenuBtn" onclick="showAdmin()" style="display:none;width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text);align-items:center;gap:10px;">
                 <i class="ti ti-shield" aria-hidden="true" style="font-size:18px;line-height:1;color:var(--text2);"></i> Админ
+            </button>
+            <button id="ownerMenuBtn" onclick="showOwnerPanel()" style="display:none;width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text);align-items:center;gap:10px;">
+                <i class="ti ti-crown" aria-hidden="true" style="font-size:18px;line-height:1;color:var(--text2);"></i> Все тренеры
             </button>
             <button onclick="showProfile()" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text);display:flex;align-items:center;gap:10px;">
                 <i class="ti ti-user" aria-hidden="true" style="font-size:18px;line-height:1;color:var(--text2);"></i> Профиль
@@ -876,10 +883,11 @@ async function doRegister() {
     const err = document.getElementById('registerError');
     err.textContent = '';
     if (!email || !pwd) { err.textContent = 'Заполни email и пароль'; return; }
+    const isCoach = document.getElementById('regIsCoach').checked;
     const resp = await fetch('/register', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({email: email, password: pwd, name: name, invite: pendingInviteCode})
+        body: JSON.stringify({email: email, password: pwd, name: name, invite: pendingInviteCode, is_coach: isCoach})
     });
     const data = await resp.json();
     if (resp.ok) {
@@ -2607,6 +2615,41 @@ async function checkAdminAccess() {
         const btn = document.getElementById('adminMenuBtn');
         if (btn) btn.style.display = 'flex';
     }
+    if (d.auth && d.is_owner) {
+        const btn = document.getElementById('ownerMenuBtn');
+        if (btn) btn.style.display = 'flex';
+    }
+}
+
+async function showOwnerPanel() {
+    document.getElementById('settingsMenu').classList.add('hidden');
+    document.getElementById('ownerModal').style.display = 'flex';
+    const resp = await fetch('/owner/coaches');
+    if (!resp.ok) { alert('Нет доступа'); return; }
+    const data = await resp.json();
+    const list = document.getElementById('ownerCoachesList');
+    if (!data.coaches.length) {
+        list.innerHTML = '<p style="color:var(--text2);font-size:15px">Тренеров пока нет</p>';
+        return;
+    }
+    list.innerHTML = data.coaches.map(c => `
+        <div style="background:var(--bg);border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+            <div>
+                <div style="font-weight:600;font-size:15px;color:var(--text)">${c.name || 'Без имени'}</div>
+                <div style="font-size:15px;color:var(--text2)">${c.email}</div>
+                <div style="font-size:15px;color:var(--text2)">тренер с ${(c.created_at||'').slice(0,10)}</div>
+            </div>
+            <button onclick="revokeCoach(${c.id},'${c.email}')" style="background:#c62828;color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;white-space:nowrap;">Отозвать статус</button>
+        </div>
+    `).join('');
+}
+
+async function revokeCoach(id, email) {
+    if (!confirm('Отозвать статус тренера у ' + email + '?')) return;
+    const resp = await fetch('/owner/revoke-coach/' + id, {method: 'POST'});
+    const d = await resp.json();
+    if (resp.ok) { showToast('Статус тренера отозван'); showOwnerPanel(); }
+    else alert(d.message);
 }
 
 // ── Достижения (tab-achievements) ──────────────────────────────────────────
@@ -2760,6 +2803,14 @@ async function loadAchievementsTab() {
         </div>
         <div id="adminUsersList"></div>
         <button class="btn-secondary" onclick="document.getElementById('adminModal').style.display='none'">✕ Закрыть</button>
+    </div>
+</div>
+<div id="ownerModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto;padding:20px;">
+    <div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:500px;margin:0 auto;display:flex;flex-direction:column;gap:12px;">
+        <h3 style="margin:0;color:var(--text)">👑 Все тренеры</h3>
+        <p style="margin:0;font-size:14px;color:var(--text2);">Только сам факт "кто сейчас тренер" — без доступа к подопечным и их данным.</p>
+        <div id="ownerCoachesList"></div>
+        <button class="btn-secondary" onclick="document.getElementById('ownerModal').style.display='none'">✕ Закрыть</button>
     </div>
 </div>
 <div id="dayManagerModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px;">
