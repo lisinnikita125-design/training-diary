@@ -1130,16 +1130,23 @@ function pickTargetDay(days, byDay) {
 
 let wsTarget = null;
 
+// Свой архивный день (active=0) скрываем, но явное персональное назначение
+// через day_visibility ("assigned") перекрывает чужую архивацию — владелец
+// может архивировать день "для себя", не отбирая его у назначенных подопечных.
+function isDayVisible(d) {
+    return !!(d.active || d.assigned);
+}
+
 // Единственное место, которое перестраивает #daySelect из свежих /days — вызывается
 // и при обычной загрузке, и при переключении вкладок, и из менеджера дней, чтобы
 // селектор никогда не расходился со сводкой "Сегодня".
 function populateDaySelect(days) {
     const sel = document.getElementById('daySelect');
     if (!sel) return;
-    const activeIds = new Set(days.filter(d => d.active).map(d => String(d.id)));
-    Array.from(sel.options).forEach(o => { if (!activeIds.has(o.value)) o.remove(); });
+    const visibleIds = new Set(days.filter(isDayVisible).map(d => String(d.id)));
+    Array.from(sel.options).forEach(o => { if (!visibleIds.has(o.value)) o.remove(); });
     const existing = new Set(Array.from(sel.options).map(o => o.value));
-    days.filter(d => d.active).forEach(d => {
+    days.filter(isDayVisible).forEach(d => {
         if (!existing.has(String(d.id))) {
             const o = document.createElement('option');
             o.value = d.id;
@@ -1161,7 +1168,7 @@ async function loadWorkoutSummary() {
             fetch('/workout-dates').then(r => r.json())
         ]);
         populateDaySelect(days);
-        wsTarget = pickTargetDay(days.filter(d => d.active), datesData.by_day || {});
+        wsTarget = pickTargetDay(days.filter(isDayVisible), datesData.by_day || {});
         if (!wsTarget) { box.classList.add('hidden'); return; }
         box.classList.remove('hidden');
 
