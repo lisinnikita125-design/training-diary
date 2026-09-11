@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
     <link rel="manifest" href="/manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
@@ -233,18 +233,27 @@
         /* Таймер тренировки */
         #workoutTimer {
             position: fixed;
-            top: 0; right: 0;
-            background: rgba(60,110,158,0.9);
-            color: white;
-            padding: 6px 12px;
-            font-size: 15px;
-            font-weight: 700;
-            z-index: 150;
-            border-bottom-left-radius: 8px;
+            top: calc(env(safe-area-inset-top, 0px) + 10px);
+            right: 12px;
             display: none;
-            backdrop-filter: blur(4px);
+            align-items: center;
+            gap: 6px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 6px 10px;
+            z-index: 150;
         }
-        #workoutTimer.visible { display: block; }
+        #workoutTimer.visible { display: flex; }
+        #workoutTimer .ti-clock { font-size: 14px; color: var(--text2); }
+        #workoutTimer #workoutTimerText {
+            font-family: var(--font-num);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.5px;
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--text);
+        }
 
         /* PR баннер */
         #prBanner {
@@ -341,7 +350,7 @@
 <!-- Таймер баннер -->
 <div id="restBar" onclick="cancelGlobalTimer()"><span class="rest-label">Отдых · нажми чтобы отменить</span><span class="rest-num" id="restBarNum">—</span></div>
 <div id="prBanner"><div id="prBannerContent"></div></div>
-<div id="workoutTimer">⏱ <span id="workoutTimerText">0:00</span></div>
+<div id="workoutTimer"><i class="ti ti-clock" aria-hidden="true"></i><span id="workoutTimerText">0:00</span></div>
 
 <!-- ═══════════ ЭКРАН ВХОДА ═══════════ -->
 <div id="loginScreen">
