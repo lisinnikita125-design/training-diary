@@ -129,18 +129,6 @@ def send_telegram(message):
         pass
 
 
-def migrate_existing_data():
-    """Привязывает существующие данные (user_id IS NULL) к первому пользователю."""
-    conn = get_db()
-    cur = conn.cursor()
-    first_user = cur.execute("SELECT id FROM users ORDER BY id LIMIT 1").fetchone()
-    if first_user:
-        uid = first_user["id"]
-        cur.execute("UPDATE workout_log SET user_id = ? WHERE user_id IS NULL", (uid,))
-        conn.commit()
-    conn.close()
-
-
 def send_email(to, subject, body_html):
     """Отправка письма через SMTP."""
     if not MAIL_USER or not MAIL_PASSWORD:
@@ -1209,30 +1197,6 @@ def get_progress_by_name():
     return jsonify({"exercise_name": name, "history": [dict(r) for r in rows]})
 
 
-@app.route("/workout-stats")
-def workout_stats():
-    require_auth()
-    name = request.args.get("name", "").strip()
-    if not name:
-        abort(400, description="Параметр name обязателен")
-    conn = get_db()
-    cur = conn.cursor()
-    uid = current_user_id()
-    rows = cur.execute("""
-        SELECT wl.workout_date,
-               MAX(wl.weight) as max_weight,
-               SUM(wl.weight * wl.reps) as tonnage
-        FROM workout_log wl
-        JOIN exercises e ON e.id = wl.exercise_id
-        WHERE e.name = ? AND wl.set_number > 0
-          AND wl.user_id = ?
-        GROUP BY wl.workout_date
-        ORDER BY wl.workout_date ASC
-    """, (name, uid)).fetchall()
-    conn.close()
-    return jsonify({"exercise_name": name, "stats": [dict(r) for r in rows]})
-
-
 # ══════════════════════════════════════════════
 #  СРАВНЕНИЕ ДВУХ ТРЕНИРОВОК
 # ══════════════════════════════════════════════
@@ -1320,27 +1284,6 @@ def workout_dates():
 # ══════════════════════════════════════════════
 #  РЕДАКТИРОВАНИЕ
 # ══════════════════════════════════════════════
-@app.route("/edit-log", methods=["POST"])
-def edit_log():
-    require_auth()
-    data = request.get_json()
-    if not data:
-        abort(400, description="Нет данных")
-    uid = current_user_id()
-    conn = get_db()
-    cur = conn.cursor()
-    # ФИКС: добавлен AND user_id = ? — только свои записи
-    cur.execute("""
-        UPDATE workout_log SET weight = ?, reps = ?, difficulty = ?
-        WHERE exercise_id IN (SELECT id FROM exercises WHERE name = ?)
-          AND workout_date = ? AND set_number = ? AND user_id = ?
-    """, (data["weight"], data["reps"], data.get("difficulty"),
-          data["exercise_name"], data["workout_date"], data["set_number"], uid))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "ok"})
-
-
 @app.route("/delete-workout", methods=["POST"])
 def delete_workout():
     require_auth()
@@ -1425,20 +1368,6 @@ def last_weight(exercise_id):
     ex = cur.execute("SELECT default_weight FROM exercises WHERE id = ?", (exercise_id,)).fetchone()
     conn.close()
     return jsonify({"weight": ex["default_weight"] if ex else 0})
-
-
-@app.route("/exercise-names")
-def get_exercise_names():
-    require_auth()
-    conn = get_db()
-    cur = conn.cursor()
-    # Только упражнения текущего пользователя
-    rows = cur.execute(
-        "SELECT DISTINCT name FROM exercises WHERE user_id = ? ORDER BY name",
-        (current_user_id(),)
-    ).fetchall()
-    conn.close()
-    return jsonify({"names": [r["name"] for r in rows]})
 
 
 @app.route("/stats-summary")
@@ -1777,37 +1706,6 @@ def last_workout_days():
     """, (uid,)).fetchall()
     conn.close()
     return jsonify({"dates": [r["workout_date"] for r in rows]})
-
-
-@app.route("/progress-by-name-grouped")
-def get_progress_grouped():
-    """История подходов сгруппированная по датам."""
-    require_auth()
-    name = request.args.get("name", "").strip()
-    if not name:
-        abort(400, description="Параметр name обязателен")
-    conn = get_db()
-    cur = conn.cursor()
-    uid = current_user_id()
-    rows = cur.execute("""
-        SELECT wl.workout_date, wl.set_number, wl.weight, wl.reps, wl.difficulty
-        FROM workout_log wl
-        JOIN exercises e ON e.id = wl.exercise_id
-        WHERE e.name = ? AND wl.set_number > 0
-          AND wl.user_id = ?
-        ORDER BY wl.workout_date DESC, wl.set_number ASC
-        LIMIT 100
-    """, (name, uid)).fetchall()
-    conn.close()
-    # Группируем по дате
-    from collections import OrderedDict
-    grouped = OrderedDict()
-    for r in rows:
-        d = r["workout_date"]
-        if d not in grouped:
-            grouped[d] = []
-        grouped[d].append(dict(r))
-    return jsonify({"exercise_name": name, "grouped": [{"date": d, "sets": s} for d, s in grouped.items()]})
 
 
 @app.route("/progression-hints")

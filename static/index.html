@@ -2431,11 +2431,6 @@ function drawMeasChart(field) {
     });
 }
 
-function showBadgeDetail(name, desc, date, earned) {
-    const status = earned ? ('✅ Получено' + (date ? ' · ' + date : '')) : '🔒 Не получено';
-    showToast(name + ': ' + desc + ' — ' + status);
-}
-
 // ══════════════════════════════════════════════
 //  СТАТИСТИКА
 // ══════════════════════════════════════════════
@@ -2998,8 +2993,10 @@ document.addEventListener('change', (e) => {
 });
 
 let dmEditingDayId = null;
+let dmSavingDay = false;
 
 async function dmAddDay() {
+    if (dmSavingDay) return;
     const msg = document.getElementById('dmMsg');
     const name = document.getElementById('dmNewDayName').value.trim();
     const visibility = document.getElementById('dmDayVisibility').value;
@@ -3010,6 +3007,11 @@ async function dmAddDay() {
         if (user_ids.length === 0) { msg.style.color = '#c62828'; msg.textContent = 'Выберите хотя бы одного человека'; return; }
     }
     const editingId = dmEditingDayId;
+    const btn = document.getElementById('dmDaySaveBtn');
+    const originalText = btn.textContent;
+    dmSavingDay = true;
+    btn.disabled = true;
+    btn.textContent = 'Сохраняю...';
     try {
         const resp = editingId
             ? await fetch('/days/' + editingId, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, visibility, user_ids})})
@@ -3022,6 +3024,10 @@ async function dmAddDay() {
     } catch(e) {
         msg.style.color = '#c62828';
         msg.textContent = 'Ошибка сохранения дня';
+        btn.textContent = originalText;
+    } finally {
+        dmSavingDay = false;
+        btn.disabled = false;
     }
 }
 
