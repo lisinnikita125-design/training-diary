@@ -503,6 +503,30 @@ def require_owns_trainee(user_id):
         abort(403)
 
 
+def my_trainee_ids(cur, coach_id):
+    """id всех подопечных тренера."""
+    return [r[0] for r in cur.execute(
+        "SELECT trainee_id FROM coach_trainees WHERE coach_id = ?", (coach_id,)
+    ).fetchall()]
+
+
+def foreign_trainee_ids(cur, user_ids):
+    """Из переданных id возвращает те, что не являются подопечными текущего тренера."""
+    own = set(my_trainee_ids(cur, current_user_id()))
+    return [u for u in user_ids if u not in own]
+
+
+def day_owner_ok(day):
+    """
+    Может ли текущий пользователь управлять днём (переименование, видимость,
+    архивация, удаление). Унаследованные "ничьи" дни (owner_user_id IS NULL)
+    достались от домультитренерских времён, более узкого владельца у них нет —
+    там поведение прежнее, управляет любой админ. Строка day должна содержать
+    owner_user_id.
+    """
+    return day["owner_user_id"] is None or day["owner_user_id"] == current_user_id()
+
+
 def require_owner():
     """
     Аварийный тормоз владельца приложения — определяется захардкоженным
@@ -747,28 +771,49 @@ def save_measurements():
 # ══════════════════════════════════════════════
 #  ДНИ И УПРАЖНЕНИЯ
 # ══════════════════════════════════════════════
+
+# Единый предикат видимости дня. Подставляется в запросы, где таблица
+# day_templates имеет алиас d, и требует три параметра — user_id трижды.
+#
+# visibility='all' означает "всем подопечным владельца дня", а НЕ всем
+# пользователям приложения: до появления тренерского режима тренер был один и
+# это было одно и то же, после — разные вещи. Исключение — унаследованные
+# "ничьи" дни (owner_user_id IS NULL, системные "День 1/2/3"): их незачем
+# задним числом приписывать какому-то одному тренеру, поэтому они остаются
+# видимыми буквально всем. Набор таких дней закрытый: add_day всегда проставляет
+# владельца, а update_day закрепляет его за днём, который перестаёт быть 'all'.
+#
+# Держим предикат в одном месте, чтобы список дней (/days) и открытие дня по
+# прямому ID (/day/<id>) не разъехались: иначе день пропадает из селектора, но
+# остаётся доступен тому, кто знает его номер.
+DAY_VISIBLE_PREDICATE = """
+    (
+        d.owner_user_id = ?
+        OR EXISTS (SELECT 1 FROM day_visibility dv2
+                   WHERE dv2.day_id = d.id AND dv2.user_id = ?)
+        OR (d.visibility = 'all' AND (
+                d.owner_user_id IS NULL
+                OR EXISTS (SELECT 1 FROM coach_trainees ct
+                           WHERE ct.coach_id = d.owner_user_id AND ct.trainee_id = ?)
+           ))
+    )
+"""
+
+
 @app.route("/day/<int:day_id>")
 def get_day(day_id):
     require_auth()
     uid = current_user_id()
     conn = get_db()
     cur = conn.cursor()
+    # Несуществующий и невидимый день отвечают одинаково (404) — чтобы по коду
+    # ответа нельзя было перебором узнать, какие day_id существуют у других.
     day = cur.execute(
-        "SELECT id, name, visibility, owner_user_id FROM day_templates WHERE id = ?",
-        (day_id,)
+        f"""SELECT d.id, d.name FROM day_templates d
+            WHERE d.id = ? AND {DAY_VISIBLE_PREDICATE}""",
+        (day_id, uid, uid, uid)
     ).fetchone()
     if not day:
-        conn.close()
-        abort(404, description="День не найден")
-
-    allowed = (
-        day["visibility"] == "all"
-        or day["owner_user_id"] == uid
-        or cur.execute(
-            "SELECT 1 FROM day_visibility WHERE day_id=? AND user_id=?", (day_id, uid)
-        ).fetchone() is not None
-    )
-    if not allowed:
         conn.close()
         abort(404, description="День не найден")
 
@@ -788,16 +833,14 @@ def get_days():
     require_auth()
     uid = resolve_target_uid()
     conn = get_db()
-    days = conn.execute("""
+    days = conn.execute(f"""
         SELECT DISTINCT d.id, d.name, d.sort_order, d.active,
                (dv.user_id IS NOT NULL) AS assigned
         FROM day_templates d
         LEFT JOIN day_visibility dv ON dv.day_id = d.id AND dv.user_id = ?
-        WHERE d.visibility = 'all'
-           OR d.owner_user_id = ?
-           OR dv.user_id IS NOT NULL
+        WHERE {DAY_VISIBLE_PREDICATE}
         ORDER BY d.sort_order
-    """, (uid, uid)).fetchall()
+    """, (uid, uid, uid, uid)).fetchall()
     conn.close()
     return jsonify([dict(d) for d in days])
 
@@ -813,10 +856,21 @@ def add_day():
         abort(400, description="Некорректная видимость")
     if not name:
         abort(400, description="Название дня обязательно")
-    user_ids = data.get("user_ids") or []
+    try:
+        user_ids = [int(u) for u in (data.get("user_ids") or [])]
+    except (TypeError, ValueError):
+        abort(400, description="Некорректный список пользователей")
 
     conn = get_db()
     cur = conn.cursor()
+
+    # Список из запроса не принимаем на веру: UI предлагает только своих
+    # подопечных, но это ограничение клиента. Чужой id — ошибка, а не тихий
+    # пропуск: иначе тренер сохранит день и не поймёт, почему человек его не видит.
+    if visibility == "custom" and foreign_trainee_ids(cur, user_ids):
+        conn.close()
+        abort(400, description="В списке есть пользователи, которые не являются вашими подопечными")
+
     max_order = cur.execute(
         "SELECT COALESCE(MAX(sort_order), 0) FROM day_templates"
     ).fetchone()[0]
@@ -850,7 +904,11 @@ def add_exercise():
 
     conn = get_db()
     cur = conn.cursor()
-    day = cur.execute("SELECT id, visibility FROM day_templates WHERE id=?", (day_id,)).fetchone()
+    day = cur.execute(
+        f"""SELECT d.id, d.visibility FROM day_templates d
+            WHERE d.id = ? AND {DAY_VISIBLE_PREDICATE}""",
+        (day_id, uid, uid, uid)
+    ).fetchone()
     if not day:
         conn.close()
         abort(404, description="День не найден")
@@ -878,17 +936,19 @@ def add_exercise():
     ))
     ex_id = cur.lastrowid
 
-    # Автокопирование упражнения тем, кому доступен день (только если добавляет админ)
+    # Автокопирование упражнения тем, кому доступен день (только если добавляет админ).
+    # Рассылка всегда ограничена своими подопечными — в том числе на унаследованных
+    # "ничьих" днях, которые видны буквально всем: видимость чужого дня читается
+    # глобально, но правка одного тренера не должна создавать строки в программе
+    # подопечного другого тренера.
     if is_admin and day["visibility"] in ("all", "custom"):
-        if day["visibility"] == "all":
-            target_ids = [r[0] for r in cur.execute(
-                "SELECT id FROM users WHERE id != ?", (uid,)
-            ).fetchall()]
-        else:
-            target_ids = [r[0] for r in cur.execute(
-                "SELECT user_id FROM day_visibility WHERE day_id=? AND user_id != ?", (day_id, uid)
-            ).fetchall()]
-        for target_uid in target_ids:
+        target_ids = set(my_trainee_ids(cur, uid))
+        if day["visibility"] == "custom":
+            assigned = {r[0] for r in cur.execute(
+                "SELECT user_id FROM day_visibility WHERE day_id=?", (day_id,)
+            ).fetchall()}
+            target_ids &= assigned
+        for target_uid in sorted(target_ids - {uid}):
             t_max_order = cur.execute(
                 "SELECT COALESCE(MAX(sort_order), 0) FROM exercises WHERE day_id=? AND user_id=?",
                 (day_id, target_uid)
@@ -945,10 +1005,13 @@ def delete_day(day_id):
     require_admin()
     conn = get_db()
     cur = conn.cursor()
-    day = cur.execute("SELECT id FROM day_templates WHERE id=?", (day_id,)).fetchone()
+    day = cur.execute("SELECT id, owner_user_id FROM day_templates WHERE id=?", (day_id,)).fetchone()
     if not day:
         conn.close()
         abort(404, description="День не найден")
+    if not day_owner_ok(day):
+        conn.close()
+        abort(403, description="Удалить день может только его владелец")
     remaining = cur.execute(
         "SELECT COUNT(*) FROM exercises WHERE day_id=?", (day_id,)
     ).fetchone()[0]
@@ -972,23 +1035,42 @@ def update_day(day_id):
         abort(400, description="Некорректная видимость")
     if not name:
         abort(400, description="Название дня обязательно")
-    user_ids = data.get("user_ids") or []
+    try:
+        user_ids = [int(u) for u in (data.get("user_ids") or [])]
+    except (TypeError, ValueError):
+        abort(400, description="Некорректный список пользователей")
 
     conn = get_db()
     cur = conn.cursor()
-    day = cur.execute("SELECT id FROM day_templates WHERE id=?", (day_id,)).fetchone()
+    day = cur.execute("SELECT id, owner_user_id FROM day_templates WHERE id=?", (day_id,)).fetchone()
     if not day:
         conn.close()
         abort(404, description="День не найден")
+    if not day_owner_ok(day):
+        conn.close()
+        abort(403, description="Редактировать день может только его владелец")
+
+    if visibility == "custom" and foreign_trainee_ids(cur, user_ids):
+        conn.close()
+        abort(400, description="В списке есть пользователи, которые не являются вашими подопечными")
 
     # Унаследованные дни (созданные до появления owner_user_id) имеют owner_user_id=NULL,
     # из-за чего d.owner_user_id=? в /days никогда не совпадает ни с одним uid. Если такой
-    # день лишают visibility='all', он становится невидимым вообще для всех, без возврата.
-    # Закрепляем владельца за тем, кто редактирует день, — но только если владельца ещё нет.
-    cur.execute(
-        "UPDATE day_templates SET name=?, visibility=?, owner_user_id=COALESCE(owner_user_id, ?) WHERE id=?",
-        (name, visibility, current_user_id(), day_id)
-    )
+    # день лишают visibility='all', он становится невидимым вообще для всех, без возврата —
+    # поэтому закрепляем владельца за тем, кто его редактирует.
+    # Но только когда день перестаёт быть 'all': захват владельца у 'all'-дня молча сузил бы
+    # исторический глобальный день до подопечных того, кто его всего лишь переименовал,
+    # отобрав его у подопечных всех остальных тренеров.
+    if visibility == "all":
+        cur.execute(
+            "UPDATE day_templates SET name=?, visibility=? WHERE id=?",
+            (name, visibility, day_id)
+        )
+    else:
+        cur.execute(
+            "UPDATE day_templates SET name=?, visibility=?, owner_user_id=COALESCE(owner_user_id, ?) WHERE id=?",
+            (name, visibility, current_user_id(), day_id)
+        )
     cur.execute("DELETE FROM day_visibility WHERE day_id=?", (day_id,))
     if visibility == "custom":
         for u in user_ids:
@@ -1010,11 +1092,8 @@ def toggle_day_active(day_id):
     if not day:
         conn.close()
         abort(404, description="День не найден")
-    # Дни с проставленным владельцем архивирует только сам владелец — архивация
-    # личная ("для себя"), а не глобальное решение любого админа. У "ничьих"
-    # унаследованных дней (owner_user_id=NULL) более узкого владельца нет,
-    # там оставляем прежнее поведение — любой админ.
-    if day["owner_user_id"] is not None and day["owner_user_id"] != current_user_id():
+    # Архивация личная ("для себя"), а не глобальное решение любого админа.
+    if not day_owner_ok(day):
         conn.close()
         abort(403, description="Архивировать день может только его владелец")
     new_active = 0 if day["active"] else 1
@@ -1030,11 +1109,14 @@ def day_details(day_id):
     conn = get_db()
     cur = conn.cursor()
     day = cur.execute(
-        "SELECT id, name, visibility FROM day_templates WHERE id=?", (day_id,)
+        "SELECT id, name, visibility, owner_user_id FROM day_templates WHERE id=?", (day_id,)
     ).fetchone()
     if not day:
         conn.close()
         abort(404, description="День не найден")
+    if not day_owner_ok(day):
+        conn.close()
+        abort(403, description="Настройки дня видны только его владельцу")
     user_ids = [r[0] for r in cur.execute(
         "SELECT user_id FROM day_visibility WHERE day_id=?", (day_id,)
     ).fetchall()]
@@ -1300,14 +1382,21 @@ def update_exercise(exercise_id):
     params.append(uid)
     cur.execute(f"UPDATE exercises SET {', '.join(updates)} WHERE id = ? AND user_id = ?", params)
 
-    # Пробрасываем изменения в копии у других пользователей (только для админа)
+    # Пробрасываем изменения в копии у других пользователей (только для админа).
+    # Как и рассылка в add_exercise — строго по своим подопечным: связь
+    # origin_exercise_id могла быть создана до скоупинга и указывать на копии
+    # чужих подопечных, править их чужой тренер не должен.
     is_admin = bool(cur.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()["is_admin"])
     if is_admin:
         propagate_fields = [f for f in allowed if f != "sort_order" and f in data and data[f] is not None]
         if propagate_fields:
             set_clause = ", ".join(f"{f} = ?" for f in propagate_fields)
-            propagate_params = [data[f] for f in propagate_fields] + [exercise_id]
-            cur.execute(f"UPDATE exercises SET {set_clause} WHERE origin_exercise_id = ?", propagate_params)
+            propagate_params = [data[f] for f in propagate_fields] + [exercise_id, uid]
+            cur.execute(
+                f"UPDATE exercises SET {set_clause} WHERE origin_exercise_id = ? "
+                "AND user_id IN (SELECT trainee_id FROM coach_trainees WHERE coach_id = ?)",
+                propagate_params
+            )
 
     conn.commit()
     conn.close()
