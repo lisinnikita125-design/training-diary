@@ -1053,6 +1053,46 @@ def delete_day(day_id):
     return jsonify({"status": "ok"})
 
 
+def backfill_exercises_for_day(cur, day_id, owner_uid, target_ids):
+    """Копирует уже существующие упражнения дня подопечным, которым день
+    только что стал виден (новая видимость или уже видимый день у нового
+    подопечного) — иначе они получают заведённые задним числом дни без единого
+    упражнения: копирование в add_exercise() рассылает только на момент
+    добавления, ничего не бэкфиллит для тех, кто видимость получил позже.
+    """
+    owner_exercises = cur.execute(
+        "SELECT id, name, machine_model, plan_sets, plan_reps_range, "
+        "default_weight, rest_seconds FROM exercises WHERE day_id=? AND user_id=?",
+        (day_id, owner_uid)
+    ).fetchall()
+    if not owner_exercises:
+        return
+    for target_uid in target_ids:
+        if target_uid == owner_uid:
+            continue
+        existing_origins = {r[0] for r in cur.execute(
+            "SELECT origin_exercise_id FROM exercises "
+            "WHERE day_id=? AND user_id=? AND origin_exercise_id IS NOT NULL",
+            (day_id, target_uid)
+        ).fetchall()}
+        missing = [ex for ex in owner_exercises if ex["id"] not in existing_origins]
+        if not missing:
+            continue
+        t_max_order = cur.execute(
+            "SELECT COALESCE(MAX(sort_order), 0) FROM exercises WHERE day_id=? AND user_id=?",
+            (day_id, target_uid)
+        ).fetchone()[0]
+        for i, ex in enumerate(missing, start=1):
+            cur.execute("""
+                INSERT INTO exercises
+                (day_id, name, machine_model, plan_sets, plan_reps_range, default_weight, rest_seconds, sort_order, user_id, origin_exercise_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                day_id, ex["name"], ex["machine_model"], ex["plan_sets"], ex["plan_reps_range"],
+                ex["default_weight"], ex["rest_seconds"], t_max_order + i, target_uid, ex["id"]
+            ))
+
+
 @app.route("/days/<int:day_id>", methods=["PATCH"])
 def update_day(day_id):
     require_admin()
@@ -1106,6 +1146,15 @@ def update_day(day_id):
                 "INSERT OR IGNORE INTO day_visibility (day_id, user_id) VALUES (?, ?)",
                 (day_id, int(u))
             )
+
+    # Та же рассылка "своим подопечным", что и в add_exercise() — визуально день
+    # уже виден, но без бэкфилла подопечный не получит его прошлых упражнений.
+    if visibility in ("all", "custom"):
+        target_ids = set(my_trainee_ids(cur, current_user_id()))
+        if visibility == "custom":
+            target_ids &= set(user_ids)
+        backfill_exercises_for_day(cur, day_id, current_user_id(), target_ids)
+
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
