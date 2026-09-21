@@ -164,6 +164,26 @@ def register_page():
     return app.send_static_file("index.html")
 
 
+def send_verification_email(email, name, token):
+    verify_url = f"{APP_URL}/verify-email?token={token}"
+    safe_name = html.escape(name)
+    send_email(email, "Подтверди email — Progressor", f"""
+    <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;background:#0f1117;border-radius:16px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#1a3d28,#2ecc71);padding:32px;text-align:center;">
+            <img src="https://nikitalisin.pythonanywhere.com/static/icon-192.png" width="64" height="64" style="border-radius:14px;margin-bottom:12px;" />
+            <h1 style="color:white;margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px;">Progressor</h1>
+            <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:13px;">Train smarter. Recover better.</p>
+        </div>
+        <div style="padding:32px;background:#1a1d26;">
+            <h2 style="color:#e8eaf0;margin:0 0 16px;font-size:20px;">Привет{', ' + safe_name if safe_name else ''}! 👋</h2>
+            <p style="color:#8b92a8;line-height:1.6;margin:0 0 24px;">Ты почти готов начать тренироваться умнее. Подтверди свой email чтобы войти в Progressor.</p>
+            <a href="{verify_url}" style="display:block;background:linear-gradient(135deg,#1a8a4a,#2ecc71);color:white;text-decoration:none;padding:14px 24px;border-radius:10px;font-weight:700;font-size:16px;text-align:center;">✅ Подтвердить email</a>
+            <p style="color:#8b92a8;font-size:12px;margin:24px 0 0;text-align:center;">Если ты не регистрировался — просто проигнорируй это письмо.</p>
+        </div>
+    </div>
+    """)
+
+
 @app.route("/register", methods=["POST"])
 def register():
     data = request.get_json() or {}
@@ -235,25 +255,30 @@ def register():
     # Копируем системную программу новому пользователю
     seed_user(user_id)
 
-    verify_url = f"{APP_URL}/verify-email?token={token}"
-    safe_name = html.escape(name)
-    send_email(email, "Подтверди email — Progressor", f"""
-    <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;background:#0f1117;border-radius:16px;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#1a3d28,#2ecc71);padding:32px;text-align:center;">
-            <img src="https://nikitalisin.pythonanywhere.com/static/icon-192.png" width="64" height="64" style="border-radius:14px;margin-bottom:12px;" />
-            <h1 style="color:white;margin:0;font-size:24px;font-weight:800;letter-spacing:-0.5px;">Progressor</h1>
-            <p style="color:rgba(255,255,255,0.8);margin:4px 0 0;font-size:13px;">Train smarter. Recover better.</p>
-        </div>
-        <div style="padding:32px;background:#1a1d26;">
-            <h2 style="color:#e8eaf0;margin:0 0 16px;font-size:20px;">Привет{', ' + safe_name if safe_name else ''}! 👋</h2>
-            <p style="color:#8b92a8;line-height:1.6;margin:0 0 24px;">Ты почти готов начать тренироваться умнее. Подтверди свой email чтобы войти в Progressor.</p>
-            <a href="{verify_url}" style="display:block;background:linear-gradient(135deg,#1a8a4a,#2ecc71);color:white;text-decoration:none;padding:14px 24px;border-radius:10px;font-weight:700;font-size:16px;text-align:center;">✅ Подтвердить email</a>
-            <p style="color:#8b92a8;font-size:12px;margin:24px 0 0;text-align:center;">Если ты не регистрировался — просто проигнорируй это письмо.</p>
-        </div>
-    </div>
-    """)
+    send_verification_email(email, name, token)
 
     return jsonify({"status": "ok", "message": "Регистрация успешна. Проверь почту для подтверждения."})
+
+
+@app.route("/resend-verification", methods=["POST"])
+def resend_verification():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").strip().lower()
+
+    conn = get_db()
+    cur = conn.cursor()
+    user = cur.execute(
+        "SELECT id, name, is_verified FROM users WHERE email = ?", (email,)
+    ).fetchone()
+    if user and not user["is_verified"]:
+        token = secrets.token_urlsafe(32)
+        cur.execute("UPDATE users SET verify_token = ? WHERE id = ?", (token, user["id"]))
+        conn.commit()
+        send_verification_email(email, user["name"] or "", token)
+    conn.close()
+
+    # Всегда отвечаем одинаково (не палим, зарегистрирован ли email)
+    return jsonify({"status": "ok", "message": "Если email зарегистрирован и не подтверждён — письмо отправлено"})
 
 
 @app.route("/verify-email")
