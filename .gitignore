@@ -44,3 +44,4 @@ backups/
 config.py
 logs/
 patch_*.py
+.claude/
