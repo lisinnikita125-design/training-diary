@@ -369,13 +369,24 @@
         <input type="text" id="regName" placeholder="Имя (необязательно)">
         <input type="email" id="regEmail" placeholder="Email">
         <div style="position:relative;display:flex;align-items:center;" data-pw-wrapped="regPassword"><input type="password" id="regPassword" placeholder="Пароль (мин. 6 символов)" onkeydown="if(event.key==='Enter')doRegister()"><button type="button" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;padding:0;color:var(--text2);" onclick="togglePassword('regPassword',this)">👁</button></div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:var(--text);padding:4px 2px;cursor:pointer;">
-            <input type="checkbox" id="regIsCoach" style="width:18px;height:18px;flex-shrink:0;">
-            Зарегистрироваться как тренер
-        </label>
+        <div id="regInviteNotice" class="hidden" style="font-size:14px;color:var(--green);background:var(--gl);border-radius:8px;padding:10px 12px;">✉️ Ты регистрируешься по приглашению тренера</div>
+        <div id="regCoachRow" style="display:flex;flex-direction:column;gap:4px;padding:4px 2px;">
+            <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:var(--text);cursor:pointer;">
+                <input type="checkbox" id="regIsCoach" style="width:18px;height:18px;flex-shrink:0;">
+                Зарегистрироваться как тренер
+            </label>
+            <span style="font-size:12px;color:var(--text2);padding-left:26px;">Тренер видит тренировки своих подопечных и может назначать им программы</span>
+        </div>
         <button class="btn-primary" onclick="doRegister()">Создать аккаунт</button>
         <span id="registerError"></span>
         <button class="auth-link" onclick="showBox('login')">Уже есть аккаунт? Войти</button>
+    </div>
+    <div class="auth-box hidden" id="boxCheckEmail">
+        <h3>📧 Проверь почту</h3>
+        <p id="checkEmailText" style="font-size:15px;color:var(--text2);text-align:center;line-height:1.5;margin:0;">Мы отправили письмо со ссылкой для подтверждения.</p>
+        <button class="btn-secondary" onclick="doResendVerification()">Отправить письмо ещё раз</button>
+        <span id="resendMsg" style="font-size:15px;text-align:center;min-height:16px;"></span>
+        <button class="auth-link" onclick="showBox('login')">← Назад ко входу</button>
     </div>
     <div class="auth-box hidden" id="boxForgot">
         <h3>Сброс пароля</h3>
@@ -487,6 +498,13 @@
 
     <!-- ═══ ТРЕНИРОВКА ═══ -->
     <div id="tab-workout">
+        <div id="welcomeBanner" class="section" style="background:var(--gl);border:1px solid var(--green);display:none;gap:10px;align-items:flex-start;">
+            <div style="flex:1;font-size:15px;color:var(--text);line-height:1.4;">
+                <b>👋 Добро пожаловать в Progressor!</b><br>
+                Это стартовая программа — нажми «Начать тренировку», чтобы записать первый результат. Свою программу настраивает тренер.
+            </div>
+            <button onclick="dismissWelcomeBanner()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text2);flex-shrink:0;padding:0;line-height:1;" title="Закрыть" aria-label="Закрыть">✕</button>
+        </div>
         <div id="workoutSummary" class="hidden">
             <div id="wsDate">Сегодня</div>
             <div id="wsDayTitle">—</div>
@@ -839,11 +857,11 @@ async function loadDemoData() {
 //  АВТОРИЗАЦИЯ
 // ══════════════════════════════════════════════
 function showBox(name) {
-    ['login','register','forgot'].forEach(n => {
+    ['login','register','forgot','checkEmail'].forEach(n => {
         const el = document.getElementById('box' + n.charAt(0).toUpperCase() + n.slice(1));
         if (el) el.classList.toggle('hidden', n !== name);
     });
-    ['loginError','registerError','forgotMsg'].forEach(id => {
+    ['loginError','registerError','forgotMsg','resendMsg'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.textContent = '';
     });
@@ -885,6 +903,8 @@ async function doLogin() {
     }
 }
 
+let lastRegisteredEmail = '';
+
 async function doRegister() {
     const name = document.getElementById('regName').value.trim();
     const email = document.getElementById('regEmail').value.trim();
@@ -892,7 +912,7 @@ async function doRegister() {
     const err = document.getElementById('registerError');
     err.textContent = '';
     if (!email || !pwd) { err.textContent = 'Заполни email и пароль'; return; }
-    const isCoach = document.getElementById('regIsCoach').checked;
+    const isCoach = pendingInviteCode ? false : document.getElementById('regIsCoach').checked;
     const resp = await fetch('/register', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -900,13 +920,28 @@ async function doRegister() {
     });
     const data = await resp.json();
     if (resp.ok) {
-        err.style.color = '#2e7d32';
-        err.textContent = '✅ ' + data.message;
-        setTimeout(() => showBox('login'), 3000);
+        lastRegisteredEmail = email;
+        document.getElementById('checkEmailText').textContent =
+            `Мы отправили письмо на ${email}. Перейди по ссылке в нём, чтобы подтвердить аккаунт.`;
+        showBox('checkEmail');
     } else {
         err.style.color = '#c62828';
         err.textContent = data.message || 'Ошибка регистрации';
     }
+}
+
+async function doResendVerification() {
+    const msg = document.getElementById('resendMsg');
+    msg.style.color = 'var(--text2)';
+    msg.textContent = 'Отправляем...';
+    const resp = await fetch('/resend-verification', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email: lastRegisteredEmail})
+    });
+    const data = await resp.json();
+    msg.style.color = resp.ok ? '#2e7d32' : '#c62828';
+    msg.textContent = data.message || (resp.ok ? 'Письмо отправлено' : 'Не удалось отправить письмо');
 }
 
 async function doForgot() {
@@ -1104,6 +1139,10 @@ window.onload = async () => {
     if (data.auth) {
         await initApp();
     } else if (pendingInviteCode) {
+        // По инвайт-ссылке нельзя одновременно стать тренером — прячем чекбокс,
+        // чтобы случайный клик не сорвал молча привязку к пригласившему тренеру.
+        document.getElementById('regCoachRow').classList.add('hidden');
+        document.getElementById('regInviteNotice').classList.remove('hidden');
         showBox('register');
     }
 };
@@ -1173,6 +1212,24 @@ function populateDaySelect(days) {
     });
 }
 
+// Баннер для нового пользователя: показывается, пока у него не сохранено ни
+// одной тренировки, и прячется навсегда после первого явного закрытия —
+// localStorage, т.к. на клиенте нет id пользователя без лишнего запроса.
+const WELCOME_DISMISS_KEY = 'progressor_welcome_dismissed';
+
+function updateWelcomeBanner(datesData) {
+    const banner = document.getElementById('welcomeBanner');
+    if (!banner) return;
+    const hasNoWorkouts = Object.keys(datesData.by_day || {}).length === 0;
+    const dismissed = localStorage.getItem(WELCOME_DISMISS_KEY) === '1';
+    banner.style.display = (hasNoWorkouts && !dismissed) ? 'flex' : 'none';
+}
+
+function dismissWelcomeBanner() {
+    try { localStorage.setItem(WELCOME_DISMISS_KEY, '1'); } catch(e) {}
+    document.getElementById('welcomeBanner').style.display = 'none';
+}
+
 async function loadWorkoutSummary() {
     const box = document.getElementById('workoutSummary');
     const now = new Date();
@@ -1185,6 +1242,7 @@ async function loadWorkoutSummary() {
             fetch('/workout-dates').then(r => r.json())
         ]);
         populateDaySelect(days);
+        updateWelcomeBanner(datesData);
         wsTarget = pickTargetDay(days.filter(isDayVisible), datesData.by_day || {});
         if (!wsTarget) { box.classList.add('hidden'); return; }
         box.classList.remove('hidden');
