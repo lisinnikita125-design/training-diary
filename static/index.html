@@ -355,13 +355,14 @@
 <!-- ═══════════ ЭКРАН ВХОДА ═══════════ -->
 <div id="loginScreen">
     <h2>⚡ Progressor</h2>
+    <div style="font-size:12px;font-weight:500;color:var(--text2);letter-spacing:1px;margin-top:-10px;">ДНЕВНИК ТРЕНИРОВОК С ПРОГРЕССИЕЙ ВЕСОВ</div>
     <div class="auth-box" id="boxLogin">
         <h3>Вход</h3>
         <input type="email" id="loginEmail" placeholder="Email" onkeydown="if(event.key==='Enter')doLogin()">
         <div style="position:relative;display:flex;align-items:center;" data-pw-wrapped="loginPassword"><input type="password" id="loginPassword" placeholder="Пароль" onkeydown="if(event.key==='Enter')doLogin()"><button type="button" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;padding:0;color:var(--text2);" onclick="togglePassword('loginPassword',this)">👁</button></div>
         <button class="btn-primary" onclick="doLogin()">Войти</button>
         <span id="loginError"></span>
-        <button class="auth-link" onclick="showBox('register')">Нет аккаунта? Зарегистрироваться</button>
+        <button class="btn-secondary" onclick="showBox('register')">Нет аккаунта? Зарегистрироваться</button>
         <button class="auth-link" onclick="showBox('forgot')">Забыл пароль</button>
     </div>
     <div class="auth-box hidden" id="boxRegister">
@@ -1216,13 +1217,15 @@ function populateDaySelect(days) {
 // одной тренировки, и прячется навсегда после первого явного закрытия —
 // localStorage, т.к. на клиенте нет id пользователя без лишнего запроса.
 const WELCOME_DISMISS_KEY = 'progressor_welcome_dismissed';
+const PROFILE_HINT_KEY = 'progressor_profile_hint_shown';
+let hadNoWorkoutsAtLoad = false;
 
 function updateWelcomeBanner(datesData) {
     const banner = document.getElementById('welcomeBanner');
     if (!banner) return;
-    const hasNoWorkouts = Object.keys(datesData.by_day || {}).length === 0;
+    hadNoWorkoutsAtLoad = Object.keys(datesData.by_day || {}).length === 0;
     const dismissed = localStorage.getItem(WELCOME_DISMISS_KEY) === '1';
-    banner.style.display = (hasNoWorkouts && !dismissed) ? 'flex' : 'none';
+    banner.style.display = (hadNoWorkoutsAtLoad && !dismissed) ? 'flex' : 'none';
 }
 
 function dismissWelcomeBanner() {
@@ -1353,7 +1356,10 @@ async function loadWorkoutHistory() {
     try {
         const data = await fetch(withViewingParam('/workout-history')).then(r => r.json());
         if (!data.history || data.history.length === 0) {
-            container.innerHTML = '<div style="text-align:center;color:var(--text2);padding:20px;">Тренировок пока нет</div>';
+            container.innerHTML = `<div style="text-align:center;color:var(--text2);padding:20px;display:flex;flex-direction:column;gap:12px;align-items:center;">
+                <span>Тренировок пока нет</span>
+                <button class="btn-primary" onclick="showTab('workout')">Начать тренировку</button>
+            </div>`;
             return;
         }
         container.innerHTML = data.history.map((w, idx) => {
@@ -1428,10 +1434,12 @@ function showTab(name) {
 // ══════════════════════════════════════════════
 //  TOAST
 // ══════════════════════════════════════════════
-function showToast(msg, isError = false) {
+function showToast(msg, isError = false, onClick = null) {
     const t = document.getElementById('toast');
     t.textContent = msg;
     t.className = isError ? 'error' : '';
+    t.onclick = onClick;
+    t.style.cursor = onClick ? 'pointer' : 'default';
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 2800);
 }
@@ -1854,6 +1862,10 @@ async function saveWorkout() {
         if (resp.ok) {
             const duration = stopWorkoutTimer();
                     showToast('✅ Сохранено!' + (duration ? ' Время: ' + duration : ''));
+                    if (hadNoWorkoutsAtLoad && localStorage.getItem(PROFILE_HINT_KEY) !== '1') {
+                        localStorage.setItem(PROFILE_HINT_KEY, '1');
+                        setTimeout(() => showToast('💡 Заполни профиль — так точнее считаем прогресс', false, showProfile), 3000);
+                    }
                     clearTableState();
                     checkPR(date);
             document.querySelectorAll('#exercisesBody .ex-block').forEach(block => {

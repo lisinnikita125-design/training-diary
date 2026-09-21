@@ -281,24 +281,39 @@ def resend_verification():
     return jsonify({"status": "ok", "message": "Если email зарегистрирован и не подтверждён — письмо отправлено"})
 
 
+def render_auth_status_page(icon, title, message, redirect=False):
+    """Брендированная страница-заглушка для /verify-email — визуально
+    продолжает тёмную тему письма и SPA, а не выпадает в голый sans-serif."""
+    refresh_tag = '<meta http-equiv="refresh" content="2;url=/">' if redirect else ""
+    return f"""<html><head>{refresh_tag}</head><body style="margin:0;font-family:Inter,Arial,sans-serif;background:#0f1117;min-height:100vh;display:flex;align-items:center;justify-content:center;">
+        <div style="max-width:400px;width:100%;margin:20px;background:#1a1d26;border-radius:16px;overflow:hidden;text-align:center;">
+            <div style="background:linear-gradient(135deg,#1a3d28,#2ecc71);padding:32px;">
+                <div style="font-size:40px;line-height:1;">{icon}</div>
+                <h1 style="color:white;margin:12px 0 0;font-size:20px;font-weight:800;">{title}</h1>
+            </div>
+            <div style="padding:28px 24px;">
+                <p style="color:#8b92a8;line-height:1.6;margin:0 0 20px;">{message}</p>
+                <a href="/" style="display:block;background:linear-gradient(135deg,#1a8a4a,#2ecc71);color:white;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:700;font-size:15px;">Войти в приложение</a>
+            </div>
+        </div>
+    </body></html>"""
+
+
 @app.route("/verify-email")
 def verify_email():
     token = request.args.get("token", "")
     if not token:
-        return "Неверная ссылка", 400
+        return render_auth_status_page("⚠️", "Неверная ссылка", "Проверь, что скопировал ссылку из письма полностью."), 400
     conn = get_db()
     cur = conn.cursor()
     user = cur.execute("SELECT id FROM users WHERE verify_token = ?", (token,)).fetchone()
     if not user:
         conn.close()
-        return "Токен не найден или уже использован", 400
+        return render_auth_status_page("⚠️", "Ссылка недействительна", "Токен не найден или уже использован — возможно, email уже подтверждён."), 400
     cur.execute("UPDATE users SET is_verified = 1, verify_token = NULL WHERE id = ?", (user["id"],))
     conn.commit()
     conn.close()
-    return """<html><body style="font-family:sans-serif;text-align:center;padding:60px">
-        <h2>✅ Email подтверждён!</h2>
-        <p><a href="/">Войти в приложение</a></p>
-    </body></html>"""
+    return render_auth_status_page("✅", "Email подтверждён!", "Сейчас перенаправим тебя на вход — или нажми кнопку ниже.", redirect=True)
 
 
 @app.route("/login", methods=["POST"])
