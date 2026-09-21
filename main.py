@@ -242,6 +242,7 @@ def register():
                 "INSERT INTO coach_trainees (coach_id, trainee_id) VALUES (?, ?)",
                 (invite_coach_id, user_id)
             )
+            backfill_exercises_for_new_trainee(cur, invite_coach_id, user_id)
             logger.info(f"COACH_INVITE_USED code={invite_code} coach_id={invite_coach_id} trainee_id={user_id}")
         else:
             logger.warning(f"COACH_INVITE_RACE_LOST code={invite_code} user_id={user_id}")
@@ -1091,6 +1092,23 @@ def backfill_exercises_for_day(cur, day_id, owner_uid, target_ids):
                 day_id, ex["name"], ex["machine_model"], ex["plan_sets"], ex["plan_reps_range"],
                 ex["default_weight"], ex["rest_seconds"], t_max_order + i, target_uid, ex["id"]
             ))
+
+
+def backfill_exercises_for_new_trainee(cur, coach_id, trainee_id):
+    """Зеркало backfill_exercises_for_day() на противоположный триггер: не
+    видимость дня меняется под уже существующих подопечных, а появляется
+    новый подопечный под уже существующие 'all'-дни тренера. Только дни с
+    visibility='all', которыми владеет именно этот тренер — custom-дни не
+    могут ещё содержать только что созданного пользователя в day_visibility,
+    а унаследованные "ничьи" all-дни (owner_user_id IS NULL) и так видны
+    всем независимо от coach_trainees, привязка их видимость не меняет.
+    """
+    day_ids = [r[0] for r in cur.execute(
+        "SELECT id FROM day_templates WHERE owner_user_id = ? AND visibility = 'all'",
+        (coach_id,)
+    ).fetchall()]
+    for day_id in day_ids:
+        backfill_exercises_for_day(cur, day_id, coach_id, [trainee_id])
 
 
 @app.route("/days/<int:day_id>", methods=["PATCH"])
