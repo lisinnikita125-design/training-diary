@@ -3035,7 +3035,7 @@ async function dmToggleArchive() {
         const resp = await fetch('/days/' + dayId + '/toggle-active', {method:'POST'});
         if (!resp.ok) throw new Error();
         const data = await resp.json();
-        msg.style.color = 'var(--green)';
+        msg.style.color = 'var(--success-text)';
         msg.textContent = data.active ? 'День возвращён из архива ✓' : 'День отправлен в архив ✓';
         await dmRefreshDays();
         loadWorkoutSummary();
@@ -3116,7 +3116,7 @@ async function dmAddDay() {
             : await fetch('/days', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, visibility, user_ids})});
         if (!resp.ok) throw new Error();
         dmCancelDayEdit();
-        msg.style.color = 'var(--green)';
+        msg.style.color = 'var(--success-text)';
         msg.textContent = editingId ? 'День обновлён ✓' : 'День создан ✓';
         await dmRefreshDays();
     } catch(e) {
@@ -3197,7 +3197,7 @@ async function dmAddExercise() {
             : await fetch('/exercises', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
         if (!resp.ok) throw new Error();
         dmCancelExerciseEdit();
-        msg.style.color = 'var(--green)';
+        msg.style.color = 'var(--success-text)';
         msg.textContent = editingId ? 'Изменения сохранены ✓' : 'Упражнение добавлено ✓';
         await dmLoadExercises(dayId);
     } catch(e) {
@@ -3238,7 +3238,7 @@ async function dmDeleteExercise(exerciseId) {
     try {
         const resp = await fetch('/exercises/' + exerciseId, {method:'DELETE'});
         if (!resp.ok) throw new Error();
-        msg.style.color = 'var(--green)';
+        msg.style.color = 'var(--success-text)';
         msg.textContent = 'Упражнение удалено ✓';
         const dayId = document.getElementById('dmDaySelect').value;
         if (dayId) await dmLoadExercises(dayId);
@@ -3258,7 +3258,7 @@ async function dmDeleteDay() {
     try {
         const resp = await fetch('/days/' + dayId, {method:'DELETE'});
         if (!resp.ok) throw new Error();
-        msg.style.color = 'var(--green)';
+        msg.style.color = 'var(--success-text)';
         msg.textContent = 'День удалён ✓';
         const mainSel = document.getElementById('daySelect');
         if (mainSel) {
