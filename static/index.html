@@ -71,28 +71,56 @@
         .theme-toggle { background:none; border:1.5px solid var(--border); border-radius:20px; padding:6px 12px; font-size:15px; color:var(--text2); cursor:pointer; }
         .btn-sm { padding:4px 10px; font-size:15px; }
 
-        /* Сводка дня */
+        /* Сводка дня — фото-фон workout-hero-bg.jpg. Оверлей и назначение цветов текста
+           калиброваны по фактической яркости фото (WCAG relative luminance, сэмплировано
+           по зонам, худший пиксель в каждой зоне — не среднее), а не на глаз: локальные
+           яркие пятна на фото (блик на диске, неоновая подсветка) доходят до L≈0.95-0.99,
+           так что var(--text2) (#868C99, L≈0.26) не держит 4.5:1 почти нигде на фото ни при
+           каком разумном оверлее — только var(--text) (L≈0.86) или полностью непрозрачная
+           плашка независимо от фото под ней. Даже для var(--text) в верхних 75% карточки
+           (где живёт весь текст) overlay должен быть ~90% непрозрачным, чтобы держать 4.5:1
+           именно над этими яркими пятнами с запасом — посчитано, не на глаз; ниже 65-90%
+           локально проваливается на пиках. Поэтому: весь текст, лежащий прямо на фото, —
+           var(--text), не var(--text2); всё, что должно выглядеть приглушённым (дата, группы
+           мышц) — завёрнуто в непрозрачную плашку (.ws-chip), её контраст не зависит от
+           оверлея вообще; нижний блок статистики — в собственной непрозрачной панели, а не
+           поверх фото напрямую. */
         .divider { border-top:1px solid var(--border); margin:14px 0; }
-        #wsDate { font-size:15px; color:var(--text2); }
+        #workoutSummary {
+            position:relative; border-radius:16px; padding:18px 16px 16px; overflow:hidden;
+            background-image:linear-gradient(to bottom, rgba(20,22,27,0.9) 0%, rgba(20,22,27,0.9) 75%, rgba(20,22,27,0.35) 100%), url('img/workout-hero-bg.jpg');
+            background-size:cover; background-position:center; box-shadow:var(--shadow);
+        }
+        .ws-chip { display:inline-block; background:var(--gl); color:var(--text2); font-size:13px; font-weight:600; padding:4px 10px; border-radius:20px; margin-bottom:6px; }
         #wsDayTitle { font-size:28px; font-weight:700; color:var(--text); margin:2px 0 4px; letter-spacing:-0.3px; }
-        #wsMuscleGroups { font-size:15px; color:var(--text2); }
-        .ws-label { font-size:15px; color:var(--text2); }
+        #workoutSummary > .ws-label { font-size:15px; color:var(--text); }
         #wsExerciseName { font-size:18px; font-weight:700; color:var(--text); margin-top:2px; }
         #wsWeightLine { display:flex; align-items:baseline; gap:8px; margin-top:4px; }
         #wsWeightLine .num { font-size:40px; font-weight:700; color:var(--text); }
-        #wsWeightLine .ws-arrow { font-size:20px; color:var(--text2); }
-        #wsWeightLine .ws-unit { font-size:16px; font-weight:600; color:var(--text2); }
-        #wsSetsReps { font-size:15px; color:var(--text2); margin-top:4px; }
-        .btn-hero { display:block; width:100%; height:50px; border:none; border-radius:11px; background:var(--green); color:#fff; font-size:16px; font-weight:600; cursor:pointer; box-shadow:none; margin-top:14px; }
+        #wsWeightLine .ws-arrow { font-size:20px; color:var(--text); }
+        #wsWeightLine .ws-unit { font-size:16px; font-weight:600; color:var(--text); }
+        #wsSetsReps { font-size:15px; color:var(--text); margin-top:4px; }
+        .btn-hero { display:block; width:100%; height:50px; border:1.5px solid var(--green); border-radius:11px; background:var(--gl); color:var(--green-text); font-size:16px; font-weight:600; cursor:pointer; box-shadow:none; margin-top:14px; }
         .btn-hero:hover { opacity:.9; }
         .btn-hero:disabled { opacity:.5; cursor:not-allowed; }
-        .ws-week-row { display:flex; gap:28px; }
+        .ws-stats-panel { background:var(--card); border-radius:12px; padding:14px 12px 12px; margin-top:14px; }
+        .ws-week-row { display:flex; gap:10px; }
+        .ws-week-stat { flex:1; background:var(--gl); border:1px solid var(--border); border-radius:16px; padding:10px 12px; text-align:center; }
         .ws-week-stat .num { font-size:28px; font-weight:700; color:var(--text); }
         .ws-week-delta { font-size:15px; color:var(--text2); }
         .ws-week-stat .ws-label { margin-top:2px; }
         .ws-pr-row { display:flex; justify-content:space-between; align-items:center; margin-top:4px; }
         #wsPrName { font-size:16px; font-weight:600; color:var(--text); }
         #wsPrValue { font-size:20px; font-weight:700; color:var(--record); }
+        /* Карточки главного экрана: обводка + приглушённый полупрозрачный фон вместо
+           сплошной заливки. Скоуплю на #tab-workout, а не на общий .section — эта же
+           класс используется на прогрессе/профиле/менеджере дней, которые пока не трогаем
+           (первая итерация — только главный экран, п.6 ТЗ). */
+        #tab-workout .section { background:rgba(30,33,40,0.6); border:1px solid var(--border); }
+        /* .ws-label — общий класс, переиспользуется вне этой карточки (прогресс, профиль,
+           инвайт-модалка), поэтому его собственный цвет (var(--text2)) не трогаем — только
+           точечный override выше для единственного прямого потомка #workoutSummary. */
+        .ws-label { font-size:15px; color:var(--text2); }
 
         /* Таблица */
         .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
@@ -364,10 +392,20 @@
                 scroll-behavior: auto !important;
             }
         }
+
+        /* Сплэш-экран. Логотип/слоган уже вшиты в саму картинку — поверх ничего не рисуем. */
+        #splashScreen {
+            position:fixed; top:0; left:0; right:0; bottom:0; z-index:600;
+            background-image:url('img/splash-bg.jpg'); background-size:cover; background-position:center;
+            opacity:1; transition:opacity .4s ease;
+        }
+        #splashScreen.fade-out { opacity:0; pointer-events:none; }
     </style>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
+
+<div id="splashScreen"></div>
 
 <!-- Таймер баннер -->
 <div id="restBar" onclick="cancelGlobalTimer()"><span class="rest-label">Отдых · нажми чтобы отменить</span><span class="rest-num" id="restBarNum">—</span></div>
@@ -529,9 +567,9 @@
             <button onclick="dismissWelcomeBanner()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text2);flex-shrink:0;padding:0;line-height:1;min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;" title="Закрыть" aria-label="Закрыть">✕</button>
         </div>
         <div id="workoutSummary" class="hidden">
-            <div id="wsDate">Сегодня</div>
+            <div id="wsDate" class="ws-chip">Сегодня</div>
             <div id="wsDayTitle">—</div>
-            <div id="wsMuscleGroups"></div>
+            <div id="wsMuscleGroups" class="ws-chip"></div>
 
             <div class="divider"></div>
 
@@ -542,25 +580,25 @@
 
             <button id="wsStartBtn" class="btn-hero" onclick="startSuggestedWorkout()">Начать тренировку</button>
 
-            <div class="divider"></div>
-
-            <div class="ws-week-row">
-                <div class="ws-week-stat">
-                    <span class="num" id="wsWeekCount">—</span>
-                    <div class="ws-label">тренировки</div>
+            <div class="ws-stats-panel">
+                <div class="ws-week-row">
+                    <div class="ws-week-stat">
+                        <span class="num" id="wsWeekCount">—</span>
+                        <div class="ws-label">тренировки</div>
+                    </div>
+                    <div class="ws-week-stat">
+                        <span class="num" id="wsWeekTonnage">—</span><span class="ws-week-delta" id="wsWeekDelta"></span>
+                        <div class="ws-label">тоннаж за неделю</div>
+                    </div>
                 </div>
-                <div class="ws-week-stat">
-                    <span class="num" id="wsWeekTonnage">—</span><span class="ws-week-delta" id="wsWeekDelta"></span>
-                    <div class="ws-label">тоннаж за неделю</div>
+
+                <div class="divider"></div>
+
+                <div class="ws-label">Недавний рекорд</div>
+                <div class="ws-pr-row">
+                    <div id="wsPrName">—</div>
+                    <div id="wsPrValue">—</div>
                 </div>
-            </div>
-
-            <div class="divider"></div>
-
-            <div class="ws-label">Недавний рекорд</div>
-            <div class="ws-pr-row">
-                <div id="wsPrName">—</div>
-                <div id="wsPrValue">—</div>
             </div>
         </div>
 
@@ -1166,10 +1204,22 @@ window.addEventListener('unhandledrejection', function(e) {
 // при загрузке страницы и передаётся в /register при отправке формы регистрации.
 const pendingInviteCode = new URLSearchParams(location.search).get('invite') || '';
 
+function hideSplashScreen() {
+    const el = document.getElementById('splashScreen');
+    if (!el) return;
+    el.classList.add('fade-out');
+    setTimeout(() => { el.style.display = 'none'; }, 400);
+}
+
 window.onload = async () => {
     await registerSW();
-    const resp = await fetch('/check-auth');
-    const data = await resp.json();
+    // Держим сплэш минимум 1.2с (чтобы не мелькнул на быстрой сети) ИЛИ пока не
+    // ответит /check-auth (чтобы не мелькнул логин перед моментальным входом
+    // в приложение на медленной сети) — что дольше.
+    const minSplash = new Promise(resolve => setTimeout(resolve, 1200));
+    const authCheck = fetch('/check-auth').then(r => r.json());
+    const [data] = await Promise.all([authCheck, minSplash]);
+    hideSplashScreen();
     if (data.auth) {
         await initApp();
     } else if (pendingInviteCode) {
