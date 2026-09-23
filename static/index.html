@@ -58,7 +58,9 @@
         h1 { font-size:22px; font-weight:700; color:var(--green-text); margin:0; letter-spacing:-0.5px; }
         h2 { font-size:19px; font-weight:600; color:var(--text); margin:0 0 12px 0; }
         .section { background:var(--card); border-radius:12px; padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
-        .day-controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+        .day-controls { display:flex; flex-direction:column; gap:8px; }
+        .day-controls-btns { display:flex; gap:8px; }
+        .day-controls-btns button { flex:1; }
         select { flex:1; min-width:180px; padding:10px 12px; font-size:15px; border:1.5px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); appearance:none; -webkit-appearance:none; }
         select:focus { outline:none; border-color:var(--green); }
         button { padding:10px 16px; font-size:15px; font-weight:600; border:none; border-radius:8px; cursor:pointer; transition:opacity .15s; }
@@ -389,10 +391,11 @@
 
         /* Навигация */
         .nav-tabs { display:flex; gap:0; background:var(--card); border-radius:10px; padding:4px; margin-bottom:14px; box-shadow:var(--shadow); }
-        .nav-tab { flex:1; display:flex; align-items:center; justify-content:center; padding:8px; font-size:15px; font-weight:600; border:none; border-radius:7px; background:none; color:var(--text2); cursor:pointer; }
+        .nav-tab { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:8px; font-size:15px; font-weight:600; border:none; border-radius:7px; background:none; color:var(--text2); cursor:pointer; }
         .nav-tab i { font-size:22px; line-height:1; color:var(--text2); }
+        .nav-tab span { font-size:11px; font-weight:600; color:var(--text2); }
         .nav-tab.active { background:var(--gl); }
-        .nav-tab.active i { color:var(--green-text); }
+        .nav-tab.active i, .nav-tab.active span { color:var(--green-text); }
 
         /* Уважаем системную настройку "уменьшить движение": гасим анимации/переходы
            до почти мгновенных вместо того чтобы вычищать их по одной — конечное
@@ -563,12 +566,12 @@
     </div>
 
     <div class="nav-tabs">
-        <button class="nav-tab active" onclick="showTab('workout')" aria-label="Тренировка"><i class="ti ti-barbell" aria-hidden="true"></i></button>
-        <button class="nav-tab" onclick="showTab('history')" aria-label="История"><i class="ti ti-history" aria-hidden="true"></i></button>
-        <button class="nav-tab" onclick="showTab('achievements')" aria-label="Достижения"><i class="ti ti-trophy" aria-hidden="true"></i></button>
-        <button class="nav-tab" onclick="showTab('progress')" aria-label="Прогресс"><i class="ti ti-trending-up" aria-hidden="true"></i></button>
-        <button class="nav-tab" onclick="showTab('compare')" aria-label="Сравнение"><i class="ti ti-scale" aria-hidden="true"></i></button>
-        <button class="nav-tab" onclick="showTab('stats')" aria-label="Статистика"><i class="ti ti-chart-bar" aria-hidden="true"></i></button>
+        <button class="nav-tab active" onclick="showTab('workout')"><i class="ti ti-barbell" aria-hidden="true"></i><span>Тренировка</span></button>
+        <button class="nav-tab" onclick="showTab('history')"><i class="ti ti-history" aria-hidden="true"></i><span>История</span></button>
+        <button class="nav-tab" onclick="showTab('achievements')"><i class="ti ti-trophy" aria-hidden="true"></i><span>Достижения</span></button>
+        <button class="nav-tab" onclick="showTab('progress')"><i class="ti ti-trending-up" aria-hidden="true"></i><span>Прогресс</span></button>
+        <button class="nav-tab" onclick="showTab('compare')"><i class="ti ti-scale" aria-hidden="true"></i><span>Сравнение</span></button>
+        <button class="nav-tab" onclick="showTab('stats')"><i class="ti ti-chart-bar" aria-hidden="true"></i><span>Статистика</span></button>
     </div>
 
     <!-- ═══ ТРЕНИРОВКА ═══ -->
@@ -619,8 +622,10 @@
         <div class="section">
             <div class="day-controls">
                 <select id="daySelect"></select>
-                <button class="btn-primary" onclick="loadDayWithRestore()">Загрузить</button>
-                <button class="btn-secondary" onclick="repeatLastWorkout()" title="Заполнить веса и повторения из прошлой тренировки этого дня">🔁 Повторить</button>
+                <div class="day-controls-btns">
+                    <button class="btn-primary" onclick="loadDayWithRestore()">Загрузить</button>
+                    <button class="btn-secondary" onclick="repeatLastWorkout()" title="Заполнить веса и повторения из прошлой тренировки этого дня">Повторить</button>
+                </div>
             </div>
         </div>
 
