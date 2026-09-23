@@ -23,9 +23,17 @@
         html { overscroll-behavior: none; }
         :root {
             --bg:#14161B; --card:#1E2128; --text:#EDEEF2; --text2:#868C99;
-            --green:#3C6E9E; --gl:#16232E; --gm:#1E3346; --border:#2A2E38;
+            /* --green (#3C6E9E) stays as-is for fills/borders — white text on it already clears 4.5:1.
+               --green-text is the same hue lightened for use as foreground text/icon color on dark
+               surfaces, where --green itself only reaches ~3:1 against --bg/--card/--gl. */
+            --green:#3C6E9E; --green-text:#6FA0D6; --gl:#16232E; --gm:#1E3346; --border:#2A2E38;
             --shadow:0 2px 8px rgba(0,0,0,0.4);
             --record:#FF5A36;
+            /* Same story as --green-text: the original darker red/green status colors only cleared
+               ~3:1 as foreground text on these dark surfaces. White text on those same darker hexes
+               (toast/delete button fills) already passes 4.5:1 and is left as literal hex, untouched —
+               only foreground text usages were moved to these lighter variables. */
+            --error-text:#FF5252; --success-text:#34A853;
             --font-num:'Bebas Neue',Impact,'Inter',sans-serif;
         }
         .num { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; }
@@ -34,19 +42,19 @@
         /* Экран входа */
         #loginScreen { position:fixed; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:var(--bg); gap:14px; z-index:500; padding:20px; }
         #loginScreen.hidden { display:none; }
-        #loginScreen h2 { color:var(--green); font-size:24px; margin:0; }
+        #loginScreen h2 { color:var(--green-text); font-size:24px; margin:0; }
         .auth-box { background:var(--card); border-radius:16px; padding:28px 24px; box-shadow:var(--shadow); width:100%; max-width:320px; display:flex; flex-direction:column; gap:12px; }
         .auth-box.hidden { display:none; }
         .auth-box input { padding:12px 16px; font-size:16px; border:1.5px solid var(--border); border-radius:10px; background:var(--bg); color:var(--text); width:100%; }
         .auth-box input:focus { outline:none; border-color:var(--green); }
         .auth-box h3 { margin:0; font-size:18px; color:var(--text); }
-        .auth-link { font-size:15px; color:var(--green); background:none; border:none; cursor:pointer; padding:0; text-decoration:underline; text-align:center; }
+        .auth-link { font-size:15px; color:var(--green-text); background:none; border:none; cursor:pointer; padding:0; text-decoration:underline; text-align:center; }
         #loginError, #registerError, #forgotMsg { font-size:15px; text-align:center; min-height:16px; }
-        #loginError, #registerError { color:#c62828; }
-        #forgotMsg { color:#2e7d32; }
+        #loginError, #registerError { color:var(--error-text); }
+        #forgotMsg { color:var(--success-text); }
 
         .top-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
-        h1 { font-size:22px; font-weight:700; color:var(--green); margin:0; letter-spacing:-0.5px; }
+        h1 { font-size:22px; font-weight:700; color:var(--green-text); margin:0; letter-spacing:-0.5px; }
         h2 { font-size:19px; font-weight:600; color:var(--text); margin:0 0 12px 0; }
         .section { background:var(--card); border-radius:12px; padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
         .day-controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -56,7 +64,7 @@
         .btn-primary { background:linear-gradient(135deg,#2C5570,#3C6E9E); color:white; box-shadow:0 2px 8px rgba(60,110,158,0.35); }
         .btn-primary:hover { opacity:.88; }
         .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
-        .btn-secondary { background:var(--gl); color:var(--green); }
+        .btn-secondary { background:var(--gl); color:var(--green-text); }
         .btn-secondary:hover { background:var(--gm); }
         .btn-danger { background:#3e1a1a; color:#ef9a9a; }
         .theme-toggle { background:none; border:1.5px solid var(--border); border-radius:20px; padding:6px 12px; font-size:15px; color:var(--text2); cursor:pointer; }
@@ -120,7 +128,7 @@
 
         /* Таймер */
         .timer-btn { background:none; border:1.5px solid var(--border); border-radius:6px; padding:4px 8px; font-size:15px; color:var(--text2); cursor:pointer; font-weight:500; }
-        .timer-btn:hover { border-color:var(--green); color:var(--green); }
+        .timer-btn:hover { border-color:var(--green); color:var(--green-text); }
 
         /* Пропуск упражнения */
         .skip-badge { font-size:15px; color:var(--text2); font-weight:600; display:block; }
@@ -138,9 +146,9 @@
         }
         #restBar.visible { transform:translateY(0); }
         #restBar .rest-label { font-size:14px; color:var(--text2); }
-        #restBar .rest-num { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:36px; font-weight:700; color:var(--green); display:block; }
+        #restBar .rest-num { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:36px; font-weight:700; color:var(--green-text); display:block; }
         #restBar.warning .rest-num { color:#e65100; }
-        #restBar.done .rest-num { color:#c62828; }
+        #restBar.done .rest-num { color:var(--error-text); }
         body.rest-active { padding-bottom:90px; }
 
         /* Заметка */
@@ -149,14 +157,14 @@
 
         .actions { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; align-items:center; }
         #totalTonnage { margin-left:auto; font-size:15px; color:var(--text2); }
-        #totalTonnage span { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:17px; font-weight:700; color:var(--green); }
+        #totalTonnage span { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:17px; font-weight:700; color:var(--green-text); }
 
         /* Прогресс */
         .progress-title { font-size:28px; font-weight:700; color:var(--text); letter-spacing:-0.3px; margin-bottom:4px; }
         .period-tabs { display:flex; gap:20px; margin-bottom:2px; }
         .period-tab { background:none; border:none; padding:4px 0 8px; font-size:15px; font-weight:600; color:var(--text2); cursor:pointer; border-bottom:2px solid transparent; }
         .period-tab.active { color:var(--text); border-bottom-color:var(--text); }
-        .strength-index-val { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:44px; font-weight:700; color:var(--green); display:block; line-height:1.1; }
+        .strength-index-val { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:44px; font-weight:700; color:var(--green-text); display:block; line-height:1.1; }
         .progress-chart-wrap { position:relative; width:100%; height:110px; margin:6px 0 4px; }
         #progressChart { width:100% !important; height:100% !important; }
         .progress-stats-row { display:flex; }
@@ -167,11 +175,11 @@
         .progress-ex-row { display:flex; align-items:baseline; justify-content:space-between; padding:10px 0; gap:10px; }
         .progress-ex-name { font-size:15px; color:var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .progress-ex-weight { font-family:var(--font-num); font-variant-numeric:tabular-nums; font-size:22px; font-weight:700; color:var(--text); white-space:nowrap; }
-        .progress-ex-delta { font-size:13px; color:var(--green); min-width:44px; text-align:right; white-space:nowrap; }
+        .progress-ex-delta { font-size:13px; color:var(--green-text); min-width:44px; text-align:right; white-space:nowrap; }
         .progress-show-all { display:block; width:100%; text-align:left; background:none; border:none; color:var(--text2); font-size:15px; font-weight:600; cursor:pointer; padding:10px 0 0; }
         #progressSearch { width:100%; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); font-size:15px; margin:10px 0 4px; }
         .chart-tabs { display:flex; gap:6px; margin:12px 0 6px; }
-        .chart-tab { padding:6px 14px; font-size:15px; border-radius:20px; border:1.5px solid var(--green); background:var(--card); color:var(--green); cursor:pointer; font-weight:500; }
+        .chart-tab { padding:6px 14px; font-size:15px; border-radius:20px; border:1.5px solid var(--green); background:var(--card); color:var(--green-text); cursor:pointer; font-weight:500; }
         .chart-tab.active { background:var(--green); color:white; }
 
         /* Редактирование */
@@ -182,14 +190,14 @@
         .compare-controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
         .compare-controls select { flex:1; min-width:140px; }
         .compare-table th:nth-child(2), .compare-table th:nth-child(3) { background:#1565c0; }
-        .diff-pos { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; color:#2e7d32; font-weight:700; }
-        .diff-neg { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; color:#c62828; font-weight:700; }
+        .diff-pos { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; color:var(--success-text); font-weight:700; }
+        .diff-neg { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; color:var(--error-text); font-weight:700; }
         .diff-zero { color:var(--text2); }
 
         /* Статистика */
         .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-top:8px; }
         .stat-card { background:var(--gl); border-radius:10px; padding:12px; text-align:center; }
-        .stat-card .val { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:30px; font-weight:700; color:var(--green); display:block; }
+        .stat-card .val { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:30px; font-weight:700; color:var(--green-text); display:block; }
         .stat-card .lbl { font-size:15px; color:var(--text2); margin-top:2px; display:block; }
 
         /* Достижения */
@@ -209,7 +217,7 @@
             margin-top: 3px;
             font-weight: 600;
         }
-        .hint-increase { background: var(--gl); color: var(--green); }
+        .hint-increase { background: var(--gl); color: var(--green-text); }
         .hint-ready    { background: var(--border); color: var(--text); }
         .hint-hold     { background: var(--card); color: var(--text2); }
 
@@ -220,7 +228,7 @@
             display: block;
             margin-top: 2px;
         }
-        .sets-counter.complete { color: var(--green); font-weight: 600; }
+        .sets-counter.complete { color: var(--green-text); font-weight: 600; }
 
         /* Анимация сохранения */
         @keyframes saveFlash {
@@ -341,7 +349,20 @@
         .nav-tab { flex:1; display:flex; align-items:center; justify-content:center; padding:8px; font-size:15px; font-weight:600; border:none; border-radius:7px; background:none; color:var(--text2); cursor:pointer; }
         .nav-tab i { font-size:22px; line-height:1; color:var(--text2); }
         .nav-tab.active { background:var(--gl); }
-        .nav-tab.active i { color:var(--green); }
+        .nav-tab.active i { color:var(--green-text); }
+
+        /* Уважаем системную настройку "уменьшить движение": гасим анимации/переходы
+           до почти мгновенных вместо того чтобы вычищать их по одной — конечное
+           состояние (флеш сохранения, PR-баннер, тряска, частицы) остаётся тем же,
+           просто без самого движения. */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
     </style>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
@@ -359,7 +380,7 @@
     <div class="auth-box" id="boxLogin">
         <h3>Вход</h3>
         <input type="email" id="loginEmail" placeholder="Email" onkeydown="if(event.key==='Enter')doLogin()">
-        <div style="position:relative;display:flex;align-items:center;" data-pw-wrapped="loginPassword"><input type="password" id="loginPassword" placeholder="Пароль" onkeydown="if(event.key==='Enter')doLogin()"><button type="button" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;padding:0;color:var(--text2);" onclick="togglePassword('loginPassword',this)">👁</button></div>
+        <div style="position:relative;display:flex;align-items:center;" data-pw-wrapped="loginPassword"><input type="password" id="loginPassword" placeholder="Пароль" onkeydown="if(event.key==='Enter')doLogin()"><button type="button" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;padding:0;color:var(--text2);min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;" onclick="togglePassword('loginPassword',this)">👁</button></div>
         <button class="btn-primary" onclick="doLogin()">Войти</button>
         <span id="loginError"></span>
         <button class="btn-secondary" onclick="showBox('register')">Нет аккаунта? Зарегистрироваться</button>
@@ -369,8 +390,8 @@
         <h3>Регистрация</h3>
         <input type="text" id="regName" placeholder="Имя (необязательно)">
         <input type="email" id="regEmail" placeholder="Email">
-        <div style="position:relative;display:flex;align-items:center;" data-pw-wrapped="regPassword"><input type="password" id="regPassword" placeholder="Пароль (мин. 6 символов)" onkeydown="if(event.key==='Enter')doRegister()"><button type="button" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;padding:0;color:var(--text2);" onclick="togglePassword('regPassword',this)">👁</button></div>
-        <div id="regInviteNotice" class="hidden" style="font-size:14px;color:var(--green);background:var(--gl);border-radius:8px;padding:10px 12px;">✉️ Ты регистрируешься по приглашению тренера</div>
+        <div style="position:relative;display:flex;align-items:center;" data-pw-wrapped="regPassword"><input type="password" id="regPassword" placeholder="Пароль (мин. 6 символов)" onkeydown="if(event.key==='Enter')doRegister()"><button type="button" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;padding:0;color:var(--text2);min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;" onclick="togglePassword('regPassword',this)">👁</button></div>
+        <div id="regInviteNotice" class="hidden" style="font-size:14px;color:var(--green-text);background:var(--gl);border-radius:8px;padding:10px 12px;">✉️ Ты регистрируешься по приглашению тренера</div>
         <div id="regCoachRow" style="display:flex;flex-direction:column;gap:4px;padding:4px 2px;">
             <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:var(--text);cursor:pointer;">
                 <input type="checkbox" id="regIsCoach" style="width:18px;height:18px;flex-shrink:0;">
@@ -404,7 +425,7 @@
         <div style="display:flex;align-items:center;gap:10px;">
             <div style="width:36px;height:36px;background:linear-gradient(135deg,#1E3346,#3C6E9E);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:white;flex-shrink:0;">P</div>
             <div style="display:flex;flex-direction:column;line-height:1.2;">
-                <span style="font-size:16px;font-weight:800;color:var(--green);letter-spacing:-0.3px;">Progressor</span>
+                <span style="font-size:16px;font-weight:800;color:var(--green-text);letter-spacing:-0.3px;">Progressor</span>
                 <span style="font-size:10px;font-weight:500;color:var(--text2);letter-spacing:1px;">Train smarter. Recover better.</span>
             </div>
         </div>
@@ -485,7 +506,7 @@
 
     <div id="viewingBanner" style="display:none;background:var(--gl);border-radius:10px;padding:10px 14px;margin:0 0 12px;align-items:center;justify-content:space-between;gap:10px;">
         <span style="font-size:15px;color:var(--text);font-weight:600;">👀 Смотришь: <span id="viewingBannerName"></span></span>
-        <button onclick="exitViewingUser()" style="background:none;border:none;color:var(--green);font-size:15px;font-weight:600;cursor:pointer;padding:4px 0;">← Назад</button>
+        <button onclick="exitViewingUser()" style="background:none;border:none;color:var(--green-text);font-size:15px;font-weight:600;cursor:pointer;padding:4px 0;">← Назад</button>
     </div>
 
     <div class="nav-tabs">
@@ -504,7 +525,7 @@
                 <b>👋 Добро пожаловать в Progressor!</b><br>
                 Это стартовая программа — нажми «Начать тренировку», чтобы записать первый результат. Свою программу настраивает тренер.
             </div>
-            <button onclick="dismissWelcomeBanner()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text2);flex-shrink:0;padding:0;line-height:1;" title="Закрыть" aria-label="Закрыть">✕</button>
+            <button onclick="dismissWelcomeBanner()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text2);flex-shrink:0;padding:0;line-height:1;min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;" title="Закрыть" aria-label="Закрыть">✕</button>
         </div>
         <div id="workoutSummary" class="hidden">
             <div id="wsDate">Сегодня</div>
@@ -748,6 +769,13 @@ function togglePassword(inputId, btn) {
   btn.textContent = show ? '🙈' : '👁';
 }
 
+// CSS transition-duration:0.01ms из reduced-motion media query не покрывает
+// scrollIntoView — это отдельный, не-CSS механизм скролла, который браузер не обязан
+// сокращать сам.
+function scrollBehaviorPreference() {
+  return (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'auto' : 'smooth';
+}
+
 // ══════════════════════════════════════════════
 //  СОСТОЯНИЕ
 // ══════════════════════════════════════════════
@@ -926,7 +954,7 @@ async function doRegister() {
             `Мы отправили письмо на ${email}. Перейди по ссылке в нём, чтобы подтвердить аккаунт.`;
         showBox('checkEmail');
     } else {
-        err.style.color = '#c62828';
+        err.style.color = 'var(--error-text)';
         err.textContent = data.message || 'Ошибка регистрации';
     }
 }
@@ -941,21 +969,21 @@ async function doResendVerification() {
         body: JSON.stringify({email: lastRegisteredEmail})
     });
     const data = await resp.json();
-    msg.style.color = resp.ok ? '#2e7d32' : '#c62828';
+    msg.style.color = resp.ok ? 'var(--success-text)' : 'var(--error-text)';
     msg.textContent = data.message || (resp.ok ? 'Письмо отправлено' : 'Не удалось отправить письмо');
 }
 
 async function doForgot() {
     const email = document.getElementById('forgotEmail').value.trim();
     const msg = document.getElementById('forgotMsg');
-    if (!email) { msg.textContent = 'Введи email'; msg.style.color='#c62828'; return; }
+    if (!email) { msg.textContent = 'Введи email'; msg.style.color='var(--error-text)'; return; }
     const resp = await fetch('/forgot-password', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({email: email})
     });
     const data = await resp.json();
-    msg.style.color = '#2e7d32';
+    msg.style.color = 'var(--success-text)';
     msg.textContent = '✅ ' + data.message;
 }
 
@@ -1337,7 +1365,7 @@ async function startSuggestedWorkout() {
     }
     sel.value = String(wsTarget.id);
     await loadDayWithRestore();
-    document.getElementById('exercisesSection').scrollIntoView({behavior:'smooth'});
+    document.getElementById('exercisesSection').scrollIntoView({behavior:scrollBehaviorPreference()});
 }
 
 // ══════════════════════════════════════════════
@@ -1370,7 +1398,7 @@ async function loadWorkoutHistory() {
                 return `<tr>
                     <td style="text-align:left;padding:5px 8px;font-size:15px;color:var(--text)">${name}</td>
                     <td style="padding:5px 8px;font-size:15px;color:var(--text2)">${setsStr}</td>
-                    <td style="padding:5px 8px;font-size:15px;font-weight:600;color:var(--green)">${maxW} кг</td>
+                    <td style="padding:5px 8px;font-size:15px;font-weight:600;color:var(--green-text)">${maxW} кг</td>
                     <td style="padding:5px 8px;font-size:15px;color:var(--text2)">${Math.round(tonnage)} кг</td>
                 </tr>`;
             }).join('');
@@ -1382,10 +1410,10 @@ async function loadWorkoutHistory() {
                     </div>
                     <div style="display:flex;align-items:center;gap:12px;">
                         <div style="text-align:right;">
-                            <div class="num" style="font-weight:700;color:var(--green);font-size:17px;">${Math.round(w.total_tonnage)} кг</div>
+                            <div class="num" style="font-weight:700;color:var(--green-text);font-size:17px;">${Math.round(w.total_tonnage)} кг</div>
                             <div style="font-size:15px;color:var(--text2);">${w.duration_seconds ? '⏱ ' + Math.floor(w.duration_seconds/60) + ' мин' : 'тоннаж'}</div>
                         </div>
-                        <button onclick="deleteWorkoutByDate('${w.date}')" style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:#c62828;" title="Удалить тренировку">🗑️</button>
+                        <button onclick="deleteWorkoutByDate('${w.date}')" style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:var(--error-text);" title="Удалить тренировку">🗑️</button>
                     </div>
                 </div>
                 ${w.note ? `<div style="padding:0 16px 12px;font-size:15px;color:var(--text2);">📝 ${escapeHtml(w.note)}</div>` : ''}
@@ -1405,7 +1433,7 @@ async function loadWorkoutHistory() {
             </div>`;
         }).join('');
     } catch(e) {
-        container.innerHTML = '<div style="text-align:center;color:#c62828;padding:20px;">Ошибка загрузки</div>';
+        container.innerHTML = '<div style="text-align:center;color:var(--error-text);padding:20px;">Ошибка загрузки</div>';
     }
 }
 
@@ -1623,7 +1651,7 @@ async function loadDay() {
         container.appendChild(block);
     }
     document.getElementById('exercisesSection').classList.remove('hidden');
-    document.getElementById('exercisesSection').scrollIntoView({behavior:'smooth', block:'start'});
+    document.getElementById('exercisesSection').scrollIntoView({behavior:scrollBehaviorPreference(), block:'start'});
     updateTotalTonnage();
 }
 
@@ -2571,7 +2599,7 @@ async function saveProfile() {
             goal: document.getElementById('profileGoal').value || null
         })
     });
-    msg.style.color = '#2e7d32';
+    msg.style.color = 'var(--success-text)';
     msg.textContent = '✅ Сохранено!';
     setTimeout(() => msg.textContent = '', 2000);
 }
@@ -2588,21 +2616,21 @@ async function changePassword() {
     });
     const d = await resp.json();
     if (resp.ok) {
-        msg.style.color = '#2e7d32';
+        msg.style.color = 'var(--success-text)';
         msg.textContent = '✅ ' + d.message;
         document.getElementById('oldPassword').value = '';
         document.getElementById('newPassword').value = '';
     } else {
-        msg.style.color = '#c62828';
+        msg.style.color = 'var(--error-text)';
         msg.textContent = '❌ ' + d.message;
     }
 }
 
 function adminButtons(u) {
     const isAdmin = u.is_admin === 1 || u.is_admin === true;
-    const toggleBtn = '<button onclick="toggleAdmin(' + u.id + ')" style="background:var(--gl);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">👑 ' + (isAdmin ? 'Снять' : 'Назначить') + '</button>';
+    const toggleBtn = '<button onclick="toggleAdmin(' + u.id + ')" style="background:var(--gl);color:var(--green-text);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">👑 ' + (isAdmin ? 'Снять' : 'Назначить') + '</button>';
     const deleteBtn = '<button onclick="deleteUser(' + u.id + ',\'' + u.email + '\')" style="background:#c62828;color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">🗑</button>';
-    const verifyBtn = u.is_verified ? '' : '<button onclick="verifyUser(' + u.id + ')" style="background:var(--gm);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">✅ Верифицировать</button>';
+    const verifyBtn = u.is_verified ? '' : '<button onclick="verifyUser(' + u.id + ')" style="background:var(--gm);color:var(--green-text);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">✅ Верифицировать</button>';
     return isAdmin ? toggleBtn : '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + toggleBtn + verifyBtn + deleteBtn + '</div>';
 }
 
@@ -2767,7 +2795,7 @@ async function loadAchievementsTab() {
       <div style="display:flex;align-items:baseline;gap:8px;margin-top:2px">
         <span style="font-size:28px;font-weight:800;color:var(--text)">${d.earned}</span>
         <span style="font-size:15px;color:var(--text2)">из ${d.total} получено</span>
-        <span style="margin-left:auto;font-size:18px;font-weight:700;color:var(--green)">${d.score}%</span>
+        <span style="margin-left:auto;font-size:18px;font-weight:700;color:var(--green-text)">${d.score}%</span>
       </div>
       <div style="height:6px;background:var(--border);border-radius:4px;margin-top:8px;overflow:hidden">
         <div style="height:100%;width:${d.score}%;background:var(--green);border-radius:4px;transition:width .4s"></div>
@@ -2778,7 +2806,7 @@ async function loadAchievementsTab() {
       if (b.earned) {
         return `
       <div class="ach-item">
-        <i class="ti ${icon} ach-icon" style="color:var(--green)" aria-hidden="true"></i>
+        <i class="ti ${icon} ach-icon" style="color:var(--green-text)" aria-hidden="true"></i>
         <div class="ach-name" style="color:var(--text)">${b.name}</div>
         <div class="ach-sub" style="color:var(--text2)">${b.date || ''}</div>
       </div>`;
@@ -2849,13 +2877,13 @@ async function loadAchievementsTab() {
         <button class="btn-primary" onclick="saveProfile()">💾 Сохранить</button>
         <hr style="border:none;border-top:1px solid var(--border);margin:4px 0;">
         <h4 style="margin:0;color:var(--text)">🔒 Сменить пароль</h4>
-        <div style="position:relative;display:flex;align-items:center;" data-pw-wrapped="oldPassword"><input id="oldPassword" type="password" placeholder="Текущий пароль" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;"><button type="button" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;padding:0;color:var(--text2);" onclick="togglePassword('oldPassword',this)">👁</button></div>
-        <div style="position:relative;display:flex;align-items:center;" data-pw-wrapped="newPassword"><input id="newPassword" type="password" placeholder="Новый пароль" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;"><button type="button" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;padding:0;color:var(--text2);" onclick="togglePassword('newPassword',this)">👁</button></div>
+        <div style="position:relative;display:flex;align-items:center;" data-pw-wrapped="oldPassword"><input id="oldPassword" type="password" placeholder="Текущий пароль" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;"><button type="button" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;padding:0;color:var(--text2);min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;" onclick="togglePassword('oldPassword',this)">👁</button></div>
+        <div style="position:relative;display:flex;align-items:center;" data-pw-wrapped="newPassword"><input id="newPassword" type="password" placeholder="Новый пароль" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;"><button type="button" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;padding:0;color:var(--text2);min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;" onclick="togglePassword('newPassword',this)">👁</button></div>
         <button class="btn-secondary" onclick="changePassword()">Изменить пароль</button>
         <span id="profileMsg" style="font-size:15px;text-align:center;min-height:16px;"></span>
         <button class="btn-secondary" onclick="document.getElementById('profileModal').style.display='none'">✕ Закрыть</button>
         <hr style="border:none;border-top:1px solid var(--border);margin:4px 0;">
-        <button onclick="deleteOwnAccount()" style="width:100%;padding:10px;background:none;border:1.5px solid #c62828;border-radius:8px;color:#c62828;cursor:pointer;font-size:15px;font-weight:600;">🗑 Удалить аккаунт</button>
+        <button onclick="deleteOwnAccount()" style="width:100%;padding:10px;background:none;border:1.5px solid var(--error-text);border-radius:8px;color:var(--error-text);cursor:pointer;font-size:15px;font-weight:600;">🗑 Удалить аккаунт</button>
     </div>
 </div>
 <div id="adminModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto;padding:20px;">
@@ -2869,7 +2897,7 @@ async function loadAchievementsTab() {
             <div class="ws-label">Ссылка-приглашение (одноразовая)</div>
             <div style="display:flex;align-items:center;gap:8px;">
                 <span id="inviteLinkText" style="flex:1;font-size:14px;color:var(--text);word-break:break-all;"></span>
-                <button onclick="copyInviteLink()" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:20px;padding:4px;flex-shrink:0;" title="Копировать ссылку">
+                <button onclick="copyInviteLink()" style="background:none;border:none;color:var(--green-text);cursor:pointer;font-size:20px;padding:4px;flex-shrink:0;" title="Копировать ссылку">
                     <i class="ti ti-copy" aria-hidden="true"></i>
                 </button>
             </div>
@@ -2912,7 +2940,7 @@ async function loadAchievementsTab() {
             <select id="dmDaySelect" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;"></select>
             <button id="dmEditDayBtn" onclick="dmEditDay()" style="display:none;padding:10px 12px;background:none;border:1.5px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:15px;white-space:nowrap;">✏️</button>
             <button id="dmArchiveDayBtn" onclick="dmToggleArchive()" style="display:none;padding:10px 12px;background:none;border:1.5px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:15px;white-space:nowrap;">🗄️</button>
-            <button id="dmDeleteDayBtn" onclick="dmDeleteDay()" style="display:none;padding:10px 12px;background:none;border:1.5px solid #c62828;border-radius:8px;color:#c62828;cursor:pointer;font-size:15px;white-space:nowrap;">🗑</button>
+            <button id="dmDeleteDayBtn" onclick="dmDeleteDay()" style="display:none;padding:10px 12px;background:none;border:1.5px solid var(--error-text);border-radius:8px;color:var(--error-text);cursor:pointer;font-size:15px;white-space:nowrap;">🗑</button>
         </div>
         <input id="dmExName" placeholder="Название упражнения" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
         <input id="dmExMachine" placeholder="Модель/номер тренажёра (необязательно)" style="padding:10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:15px;">
@@ -3007,12 +3035,12 @@ async function dmToggleArchive() {
         const resp = await fetch('/days/' + dayId + '/toggle-active', {method:'POST'});
         if (!resp.ok) throw new Error();
         const data = await resp.json();
-        msg.style.color = 'var(--green)';
+        msg.style.color = 'var(--success-text)';
         msg.textContent = data.active ? 'День возвращён из архива ✓' : 'День отправлен в архив ✓';
         await dmRefreshDays();
         loadWorkoutSummary();
     } catch(e) {
-        msg.style.color = '#c62828';
+        msg.style.color = 'var(--error-text)';
         msg.textContent = 'Не удалось изменить статус дня';
     }
 }
@@ -3042,7 +3070,7 @@ async function dmLoadExercises(dayId) {
                 <span>• ${ex.name}${ex.plan_sets ? ' — ' + ex.plan_sets + '×' + (ex.plan_reps_range || '') : ''}</span>
                 <span style="display:flex;gap:6px;flex-shrink:0;">
                     <button onclick="dmEditExercise(${ex.id})" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;">✏️</button>
-                    <button onclick="dmDeleteExercise(${ex.id})" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:16px;">🗑</button>
+                    <button onclick="dmDeleteExercise(${ex.id})" style="background:none;border:none;color:var(--error-text);cursor:pointer;font-size:16px;">🗑</button>
                 </span>
             </div>`
         ).join('') || '<div>Пока пусто</div>';
@@ -3070,11 +3098,11 @@ async function dmAddDay() {
     const msg = document.getElementById('dmMsg');
     const name = document.getElementById('dmNewDayName').value.trim();
     const visibility = document.getElementById('dmDayVisibility').value;
-    if (!name) { msg.style.color = '#c62828'; msg.textContent = 'Введите название дня'; return; }
+    if (!name) { msg.style.color = 'var(--error-text)'; msg.textContent = 'Введите название дня'; return; }
     let user_ids = [];
     if (visibility === 'custom') {
         user_ids = Array.from(document.querySelectorAll('.dm-user-check:checked')).map(el => parseInt(el.value));
-        if (user_ids.length === 0) { msg.style.color = '#c62828'; msg.textContent = 'Выберите хотя бы одного человека'; return; }
+        if (user_ids.length === 0) { msg.style.color = 'var(--error-text)'; msg.textContent = 'Выберите хотя бы одного человека'; return; }
     }
     const editingId = dmEditingDayId;
     const btn = document.getElementById('dmDaySaveBtn');
@@ -3088,11 +3116,11 @@ async function dmAddDay() {
             : await fetch('/days', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, visibility, user_ids})});
         if (!resp.ok) throw new Error();
         dmCancelDayEdit();
-        msg.style.color = 'var(--green)';
+        msg.style.color = 'var(--success-text)';
         msg.textContent = editingId ? 'День обновлён ✓' : 'День создан ✓';
         await dmRefreshDays();
     } catch(e) {
-        msg.style.color = '#c62828';
+        msg.style.color = 'var(--error-text)';
         msg.textContent = 'Ошибка сохранения дня';
         btn.textContent = originalText;
     } finally {
@@ -3125,7 +3153,7 @@ async function dmEditDay() {
         document.getElementById('dmDayCancelBtn').style.display = 'inline-block';
         msg.textContent = '';
     } catch(e) {
-        msg.style.color = '#c62828';
+        msg.style.color = 'var(--error-text)';
         msg.textContent = 'Не удалось загрузить данные дня';
     }
 }
@@ -3147,7 +3175,7 @@ async function dmAddExercise() {
     const msg = document.getElementById('dmMsg');
     const dayId = document.getElementById('dmDaySelect').value;
     const name = document.getElementById('dmExName').value.trim();
-    if (!dayId || !name) { msg.style.color = '#c62828'; msg.textContent = 'Выберите день и введите название'; return; }
+    if (!dayId || !name) { msg.style.color = 'var(--error-text)'; msg.textContent = 'Выберите день и введите название'; return; }
     const editingId = dmEditingExerciseId;
     const payload = {
         day_id: parseInt(dayId),
@@ -3169,11 +3197,11 @@ async function dmAddExercise() {
             : await fetch('/exercises', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
         if (!resp.ok) throw new Error();
         dmCancelExerciseEdit();
-        msg.style.color = 'var(--green)';
+        msg.style.color = 'var(--success-text)';
         msg.textContent = editingId ? 'Изменения сохранены ✓' : 'Упражнение добавлено ✓';
         await dmLoadExercises(dayId);
     } catch(e) {
-        msg.style.color = '#c62828';
+        msg.style.color = 'var(--error-text)';
         msg.textContent = 'Ошибка сохранения';
         btn.textContent = originalText;
     } finally {
@@ -3210,12 +3238,12 @@ async function dmDeleteExercise(exerciseId) {
     try {
         const resp = await fetch('/exercises/' + exerciseId, {method:'DELETE'});
         if (!resp.ok) throw new Error();
-        msg.style.color = 'var(--green)';
+        msg.style.color = 'var(--success-text)';
         msg.textContent = 'Упражнение удалено ✓';
         const dayId = document.getElementById('dmDaySelect').value;
         if (dayId) await dmLoadExercises(dayId);
     } catch(e) {
-        msg.style.color = '#c62828';
+        msg.style.color = 'var(--error-text)';
         msg.textContent = 'Не удалось удалить — возможно, по нему уже есть история тренировок';
     }
 }
@@ -3230,7 +3258,7 @@ async function dmDeleteDay() {
     try {
         const resp = await fetch('/days/' + dayId, {method:'DELETE'});
         if (!resp.ok) throw new Error();
-        msg.style.color = 'var(--green)';
+        msg.style.color = 'var(--success-text)';
         msg.textContent = 'День удалён ✓';
         const mainSel = document.getElementById('daySelect');
         if (mainSel) {
@@ -3239,7 +3267,7 @@ async function dmDeleteDay() {
         }
         await dmRefreshDays();
     } catch(e) {
-        msg.style.color = '#c62828';
+        msg.style.color = 'var(--error-text)';
         msg.textContent = 'Не удалось удалить — возможно, в дне ещё остались чьи-то упражнения';
     }
 }
