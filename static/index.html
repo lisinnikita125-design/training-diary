@@ -30,10 +30,11 @@
             --shadow:0 2px 8px rgba(0,0,0,0.4);
             --record:#FF5A36;
             /* Same story as --green-text: the original darker red/green status colors only cleared
-               ~3:1 as foreground text on these dark surfaces. White text on those same darker hexes
-               (toast/delete button fills) already passes 4.5:1 and is left as literal hex, untouched —
-               only foreground text usages were moved to these lighter variables. */
-            --error-text:#FF5252; --success-text:#34A853;
+               ~3:1 as foreground text on these dark surfaces, so --error-text/--success-text are
+               lighter variants used specifically for text. --error-bg is the original darker red,
+               kept for background fills where it sits under white text (already passes 4.5:1 there)
+               — single source instead of the same hex duplicated as a literal in three places. */
+            --error-text:#FF5252; --success-text:#34A853; --error-bg:#c62828;
             --font-num:'Bebas Neue',Impact,'Inter',sans-serif;
         }
         .num { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; }
@@ -342,7 +343,7 @@
         /* Toast */
         #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px); background:linear-gradient(135deg, #2C5570, var(--green)); color:white; padding:12px 24px; border-radius:24px; font-size:15px; font-weight:600; box-shadow:0 4px 16px rgba(60,110,158,0.4); transition:transform .3s; z-index:300; white-space:nowrap; }
         #toast.show { transform:translateX(-50%) translateY(0); }
-        #toast.error { background:#c62828; }
+        #toast.error { background:var(--error-bg); }
 
         /* Навигация */
         .nav-tabs { display:flex; gap:0; background:var(--card); border-radius:10px; padding:4px; margin-bottom:14px; box-shadow:var(--shadow); }
@@ -423,7 +424,7 @@
 <div id="app" class="hidden">
     <div class="top-bar">
         <div style="display:flex;align-items:center;gap:10px;">
-            <div style="width:36px;height:36px;background:linear-gradient(135deg,#1E3346,#3C6E9E);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:white;flex-shrink:0;">P</div>
+            <div style="width:36px;height:36px;background:linear-gradient(135deg,var(--gm),var(--green));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:white;flex-shrink:0;">P</div>
             <div style="display:flex;flex-direction:column;line-height:1.2;">
                 <span style="font-size:16px;font-weight:800;color:var(--green-text);letter-spacing:-0.3px;">Progressor</span>
                 <span style="font-size:10px;font-weight:500;color:var(--text2);letter-spacing:1px;">Train smarter. Recover better.</span>
@@ -474,7 +475,7 @@
             <button onclick="hideProfileScreen()" style="background:none;border:none;color:var(--text2);font-size:15px;cursor:pointer;padding:8px 0;">← Назад</button>
 
             <div style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:16px 0 4px;">
-                <div id="profileAvatar" style="width:84px;height:84px;border-radius:50%;background:linear-gradient(135deg,#1E3346,#3C6E9E);display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:white;">—</div>
+                <div id="profileAvatar" style="width:84px;height:84px;border-radius:50%;background:linear-gradient(135deg,var(--gm),var(--green));display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:white;">—</div>
                 <div id="profileScreenName" style="font-size:22px;font-weight:800;color:var(--text);margin-top:12px;">—</div>
                 <div id="profileScreenSince" style="font-size:14px;color:var(--text2);margin-top:2px;">—</div>
             </div>
@@ -492,7 +493,7 @@
             <div class="ws-label">Достижения</div>
             <div id="profileAchScore" style="font-size:18px;font-weight:700;color:var(--text);margin-top:2px;">—</div>
             <div style="height:6px;background:var(--border);border-radius:4px;margin-top:8px;overflow:hidden;">
-                <div id="profileAchBar" style="height:100%;width:0%;background:var(--green);border-radius:4px;transition:width .4s;"></div>
+                <div id="profileAchBar" style="height:100%;width:100%;background:var(--green);border-radius:4px;transform:scaleX(0);transform-origin:left;transition:transform .4s;"></div>
             </div>
 
             <div class="divider"></div>
@@ -779,6 +780,10 @@ function scrollBehaviorPreference() {
 // ══════════════════════════════════════════════
 //  СОСТОЯНИЕ
 // ══════════════════════════════════════════════
+// Chart.js configs can't reference a CSS custom property directly — this reads
+// --green once so the chart accent stays a single source with :root instead of
+// duplicating the hex as a literal in every dataset config.
+const CHART_ACCENT_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--green').trim();
 let progressChartInstance = null;
 let weeklyChartInstance = null;
 let globalTimer = null;
@@ -838,7 +843,7 @@ async function showProfileScreen() {
 
         if (ach.status === 'ok') {
             document.getElementById('profileAchScore').textContent = ach.earned + ' из ' + ach.total;
-            document.getElementById('profileAchBar').style.width = ach.score + '%';
+            document.getElementById('profileAchBar').style.transform = 'scaleX(' + (ach.score / 100) + ')';
         }
     } catch (e) {
         showToast('Ошибка загрузки профиля', true);
@@ -2045,7 +2050,7 @@ function drawStrengthChart(chart) {
             labels: points.map(p => p.date),
             datasets: [{
                 data: points.map(p => p.value),
-                borderColor: '#3C6E9E',
+                borderColor: CHART_ACCENT_COLOR,
                 borderWidth: 2,
                 pointRadius: 0,
                 tension: 0.35,
@@ -2400,11 +2405,11 @@ async function loadBodyWeight() {
                 datasets: [{
                     label: 'Вес (кг)',
                     data: values,
-                    borderColor: '#3C6E9E',
+                    borderColor: CHART_ACCENT_COLOR,
                     backgroundColor: 'rgba(60,110,158,0.1)',
                     tension: 0.3,
                     pointRadius: 5,
-                    pointBackgroundColor: '#3C6E9E',
+                    pointBackgroundColor: CHART_ACCENT_COLOR,
                     fill: true
                 }]
             },
@@ -2509,10 +2514,10 @@ function drawMeasChart(field) {
             datasets: [{
                 label: names[field] + ' (см)',
                 data: values,
-                borderColor: '#3C6E9E',
+                borderColor: CHART_ACCENT_COLOR,
                 backgroundColor: 'rgba(60,110,158,0.1)',
                 borderWidth: 2,
-                pointBackgroundColor: '#3C6E9E',
+                pointBackgroundColor: CHART_ACCENT_COLOR,
                 pointRadius: 4,
                 tension: 0.3,
                 spanGaps: true
@@ -2629,7 +2634,7 @@ async function changePassword() {
 function adminButtons(u) {
     const isAdmin = u.is_admin === 1 || u.is_admin === true;
     const toggleBtn = '<button onclick="toggleAdmin(' + u.id + ')" style="background:var(--gl);color:var(--green-text);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">👑 ' + (isAdmin ? 'Снять' : 'Назначить') + '</button>';
-    const deleteBtn = '<button onclick="deleteUser(' + u.id + ',\'' + u.email + '\')" style="background:#c62828;color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">🗑</button>';
+    const deleteBtn = '<button onclick="deleteUser(' + u.id + ',\'' + u.email + '\')" style="background:var(--error-bg);color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">🗑</button>';
     const verifyBtn = u.is_verified ? '' : '<button onclick="verifyUser(' + u.id + ')" style="background:var(--gm);color:var(--green-text);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">✅ Верифицировать</button>';
     return isAdmin ? toggleBtn : '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + toggleBtn + verifyBtn + deleteBtn + '</div>';
 }
@@ -2741,7 +2746,7 @@ async function showOwnerPanel() {
                 <div style="font-size:15px;color:var(--text2)">${c.email}</div>
                 <div style="font-size:15px;color:var(--text2)">тренер с ${(c.created_at||'').slice(0,10)}</div>
             </div>
-            <button onclick="revokeCoach(${c.id},'${c.email}')" style="background:#c62828;color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;white-space:nowrap;">Отозвать статус</button>
+            <button onclick="revokeCoach(${c.id},'${c.email}')" style="background:var(--error-bg);color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;white-space:nowrap;">Отозвать статус</button>
         </div>
     `).join('');
 }
@@ -2798,7 +2803,7 @@ async function loadAchievementsTab() {
         <span style="margin-left:auto;font-size:18px;font-weight:700;color:var(--green-text)">${d.score}%</span>
       </div>
       <div style="height:6px;background:var(--border);border-radius:4px;margin-top:8px;overflow:hidden">
-        <div style="height:100%;width:${d.score}%;background:var(--green);border-radius:4px;transition:width .4s"></div>
+        <div style="height:100%;width:100%;background:var(--green);border-radius:4px;transform:scaleX(${d.score / 100});transform-origin:left;transition:transform .4s"></div>
       </div>`;
 
     grid.innerHTML = d.badges.map(b => {
