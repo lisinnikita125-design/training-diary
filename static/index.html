@@ -65,6 +65,12 @@
         .btn-primary { background:linear-gradient(135deg,#2C5570,#3C6E9E); color:white; box-shadow:0 2px 8px rgba(60,110,158,0.35); }
         .btn-primary:hover { opacity:.88; }
         .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+        /* Обводка вместо сплошной заливки (п.5 брифа), распространено на статистику/
+           профиль/менеджер дней. .btn-primary общий класс (логин, главный экран и т.д.,
+           которые не трогаем в этой волне) — поэтому скоуп по контейнеру, не сам класс. */
+        #tab-stats .btn-primary, #profileModal .btn-primary, #dayManagerModal .btn-primary {
+            background:var(--gl); border:1.5px solid var(--green); color:var(--green-text); box-shadow:none;
+        }
         .btn-secondary { background:var(--gl); color:var(--green-text); }
         .btn-secondary:hover { background:var(--gm); }
         .btn-danger { background:#3e1a1a; color:#ef9a9a; }
@@ -112,11 +118,12 @@
         .ws-pr-row { display:flex; justify-content:space-between; align-items:center; margin-top:4px; }
         #wsPrName { font-size:16px; font-weight:600; color:var(--text); }
         #wsPrValue { font-size:20px; font-weight:700; color:var(--record); }
-        /* Карточки главного экрана: обводка + приглушённый полупрозрачный фон вместо
-           сплошной заливки. Скоуплю на #tab-workout, а не на общий .section — эта же
-           класс используется на прогрессе/профиле/менеджере дней, которые пока не трогаем
-           (первая итерация — только главный экран, п.6 ТЗ). */
-        #tab-workout .section { background:rgba(30,33,40,0.6); border:1px solid var(--border); }
+        /* Карточки: обводка + приглушённый полупрозрачный фон вместо сплошной заливки.
+           Скоуплю по контейнеру экрана, а не меняю общий .section — он используется ещё
+           на логине/сравнении/истории/достижениях, которые в списке правок не значились
+           (итерация 1 — главный экран; итерация 2 — прогресс/профиль/менеджер дней/
+           статистика; остальное не трогаем). */
+        #tab-workout .section, #tab-stats .section { background:rgba(30,33,40,0.6); border:1px solid var(--border); }
         /* .ws-label — общий класс, переиспользуется вне этой карточки (прогресс, профиль,
            инвайт-модалка), поэтому его собственный цвет (var(--text2)) не трогаем — только
            точечный override выше для единственного прямого потомка #workoutSummary. */
@@ -196,8 +203,11 @@
         .strength-index-val { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:44px; font-weight:700; color:var(--green-text); display:block; line-height:1.1; }
         .progress-chart-wrap { position:relative; width:100%; height:110px; margin:6px 0 4px; }
         #progressChart { width:100% !important; height:100% !important; }
-        .progress-stats-row { display:flex; }
-        .progress-stat { flex:1; text-align:left; }
+        /* Пилюли вместо голого текста в ряд — тот же приём, что .ws-week-stat на главном
+           экране (п.4 брифа). .progress-stat используется только здесь и в #profileScreen
+           (оба — часть этой волны правок), поэтому меняю базовый класс напрямую. */
+        .progress-stats-row { display:flex; gap:10px; }
+        .progress-stat { flex:1; text-align:left; background:var(--gl); border:1px solid var(--border); border-radius:16px; padding:10px 12px; }
         .progress-stat .num { font-size:26px; font-weight:700; color:var(--text); display:block; }
         .progress-stat .num.record { color:var(--record); }
         .progress-stat .lbl { font-size:15px; color:var(--text2); margin-top:2px; display:block; }
@@ -225,7 +235,11 @@
 
         /* Статистика */
         .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-top:8px; }
-        .stat-card { background:var(--gl); border-radius:10px; padding:12px; text-align:center; }
+        /* Обводка + приглушённый фон вместо сплошной заливки, сильнее скруглить —
+           тот же приём с главного экрана (п.4), распространённый на статистику.
+           .stat-card используется только на вкладке "Статистика" — базовый класс
+           можно менять напрямую. */
+        .stat-card { background:rgba(30,33,40,0.6); border:1px solid var(--border); border-radius:16px; padding:12px; text-align:center; }
         .stat-card .val { font-family:var(--font-num); font-variant-numeric:tabular-nums; letter-spacing:0.5px; font-size:30px; font-weight:700; color:var(--green-text); display:block; }
         .stat-card .lbl { font-size:15px; color:var(--text2); margin-top:2px; display:block; }
 
