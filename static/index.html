@@ -173,13 +173,19 @@
         .skip-reason { font-size:15px; color:var(--text2); }
 
         /* Глобальный таймер */
+        /* Над закреплённым .nav-tabs, а не поверх него: 61px — его высота с
+           загруженными иконками (4+8+22+2+~14+8+4 + 1px border-top). В скрытом
+           состоянии уезжаем вниз ещё и на этот отступ, иначе низ полосы остался
+           бы на экране поверх меню. */
         #restBar {
-            position:fixed; left:0; right:0; bottom:0;
+            --nav-offset:calc(61px + env(safe-area-inset-bottom, 0px));
+            position:fixed; left:0; right:0;
+            bottom:var(--nav-offset);
             background:rgba(30,33,40,0.72);
             backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
             border-top:1px solid var(--border);
             padding:14px 20px; text-align:center;
-            transform:translateY(100%); transition:transform .3s;
+            transform:translateY(calc(100% + var(--nav-offset))); transition:transform .3s;
             z-index:200; cursor:pointer;
         }
         #restBar.visible { transform:translateY(0); }
@@ -982,15 +988,25 @@ function showBox(name) {
 // формы входа (doLogin), чтобы #daySelect и сводка "Сегодня" не расходились
 // в зависимости от того, каким путём пользователь попал в приложение.
 async function initApp() {
+    showApp();
+    await loadDashboardData();
+    await restoreActiveWorkoutOnLoad();
+}
+
+function showApp() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     const ws = document.getElementById('welcomeScreen');
     if (ws) ws.style.display = 'none';
+}
+
+// Можно звать, пока #app ещё скрыт (под сплэшем). restoreActiveWorkoutOnLoad
+// сюда не входит: его scrollIntoView на скрытом #app молча не срабатывает.
+async function loadDashboardData() {
     checkAdminAccess();
     await loadWorkoutSummary();
     const rem = await fetch('/check-reminder').then(r=>r.json()).catch(()=>({}));
     if (rem.days_since >= 3) maybeNotify(rem.days_since);
-    await restoreActiveWorkoutOnLoad();
 }
 
 async function doLogin() {
@@ -1249,18 +1265,47 @@ function hideSplashScreen() {
     setTimeout(() => { el.style.display = 'none'; }, 400);
 }
 
+const SPLASH_MIN_MS = 5000;
+const SPLASH_MAX_MS = 7000;
+const SPLASH_MIN_MS_GUEST = 1200;
+const AUTH_CHECK_TIMEOUT_MS = 7000;
+
 window.onload = async () => {
     await registerSW();
-    // Держим сплэш минимум 1.2с (чтобы не мелькнул на быстрой сети) ИЛИ пока не
-    // ответит /check-auth (чтобы не мелькнул логин перед моментальным входом
-    // в приложение на медленной сети) — что дольше.
-    const minSplash = new Promise(resolve => setTimeout(resolve, 1200));
-    const authCheck = fetch('/check-auth').then(r => r.json());
-    const [data] = await Promise.all([authCheck, minSplash]);
-    hideSplashScreen();
+    // Сплэш держится не меньше SPLASH_MIN_MS, а дашборд тем временем грузится
+    // под ним, чтобы открыться сразу заполненным, без "—". Если сеть медленная,
+    // через SPLASH_MAX_MS показываем приложение как есть — данные дотянутся сами.
+    // Гостю дашборд не нужен, ему хватает короткого SPLASH_MIN_MS_GUEST.
+    const minSplash = new Promise(resolve => setTimeout(resolve, SPLASH_MIN_MS));
+    const maxSplash = new Promise(resolve => setTimeout(resolve, SPLASH_MAX_MS));
+    const minSplashGuest = new Promise(resolve => setTimeout(resolve, SPLASH_MIN_MS_GUEST));
+
+    let data;
+    try {
+        data = await Promise.race([
+            fetch('/check-auth').then(r => r.json()),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), AUTH_CHECK_TIMEOUT_MS))
+        ]);
+    } catch (e) {
+        // Нет сети или сервер не ответил вовремя — ведём как гостя, а не держим сплэш вечно.
+        data = { auth: false };
+    }
+
     if (data.auth) {
-        await initApp();
-    } else if (pendingInviteCode) {
+        const dashboardReady = loadDashboardData().catch(e => {
+            console.error('Dashboard load failed:', e);
+            showToast('Ошибка соединения с сервером', true);
+        });
+        await Promise.race([Promise.all([minSplash, dashboardReady]), maxSplash]);
+        showApp();
+        hideSplashScreen();
+        await dashboardReady;
+        await restoreActiveWorkoutOnLoad();
+        return;
+    }
+    await minSplashGuest;
+    hideSplashScreen();
+    if (pendingInviteCode) {
         // По инвайт-ссылке нельзя одновременно стать тренером — прячем чекбокс,
         // чтобы случайный клик не сорвал молча привязку к пригласившему тренеру.
         document.getElementById('regCoachRow').classList.add('hidden');
@@ -1855,10 +1900,7 @@ function toggleSetDone(exId, idx) {
     renderSetRowInto(exId, idx);
     updateTotalTonnage();
     saveTableState();
-    if (st.done) {
-        const hasMorePending = exerciseSets[exId].some(s => !s.done);
-        if (hasMorePending) startTimer(exerciseMeta[exId].restSecs);
-    }
+    if (st.done) startTimer(exerciseMeta[exId].restSecs);
 }
 
 function editSetValue(exId, idx, field, el) {
