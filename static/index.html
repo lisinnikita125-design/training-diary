@@ -1267,15 +1267,30 @@ function hideSplashScreen() {
 
 const SPLASH_MIN_MS = 5000;
 const SPLASH_MAX_MS = 7000;
+const SPLASH_MIN_MS_GUEST = 1200;
+const AUTH_CHECK_TIMEOUT_MS = 7000;
 
 window.onload = async () => {
     await registerSW();
     // Сплэш держится не меньше SPLASH_MIN_MS, а дашборд тем временем грузится
     // под ним, чтобы открыться сразу заполненным, без "—". Если сеть медленная,
     // через SPLASH_MAX_MS показываем приложение как есть — данные дотянутся сами.
+    // Гостю дашборд не нужен, ему хватает короткого SPLASH_MIN_MS_GUEST.
     const minSplash = new Promise(resolve => setTimeout(resolve, SPLASH_MIN_MS));
     const maxSplash = new Promise(resolve => setTimeout(resolve, SPLASH_MAX_MS));
-    const data = await fetch('/check-auth').then(r => r.json());
+    const minSplashGuest = new Promise(resolve => setTimeout(resolve, SPLASH_MIN_MS_GUEST));
+
+    let data;
+    try {
+        data = await Promise.race([
+            fetch('/check-auth').then(r => r.json()),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), AUTH_CHECK_TIMEOUT_MS))
+        ]);
+    } catch (e) {
+        // Нет сети или сервер не ответил вовремя — ведём как гостя, а не держим сплэш вечно.
+        data = { auth: false };
+    }
+
     if (data.auth) {
         const dashboardReady = loadDashboardData().catch(e => {
             console.error('Dashboard load failed:', e);
@@ -1288,7 +1303,7 @@ window.onload = async () => {
         await restoreActiveWorkoutOnLoad();
         return;
     }
-    await minSplash;
+    await minSplashGuest;
     hideSplashScreen();
     if (pendingInviteCode) {
         // По инвайт-ссылке нельзя одновременно стать тренером — прячем чекбокс,
