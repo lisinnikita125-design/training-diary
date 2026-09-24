@@ -1,4 +1,4 @@
-const CACHE_NAME = 'training-diary-v4';
+const CACHE_NAME = 'training-diary-v5';
 const STATIC_ASSETS = [
     '/static/index.html',
     'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
@@ -32,7 +32,10 @@ self.addEventListener('fetch', event => {
         url.pathname.startsWith('/exercise') || url.pathname.startsWith('/workout') ||
         url.pathname.startsWith('/compare') || url.pathname.startsWith('/export') ||
         url.pathname.startsWith('/login') || url.pathname.startsWith('/logout') ||
-        url.pathname.startsWith('/body-weight') || url.pathname.startsWith('/measurements')) {
+        url.pathname.startsWith('/body-weight') || url.pathname.startsWith('/measurements') ||
+        url.pathname.startsWith('/admin') || url.pathname.startsWith('/owner') ||
+        url.pathname.startsWith('/profile') || url.pathname.startsWith('/achievements') ||
+        url.pathname.startsWith('/prs') || url.pathname.startsWith('/last-workout-days')) {
         return; // Не перехватываем API
     }
 
