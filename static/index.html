@@ -875,6 +875,7 @@ let progressPeriod = '3m';
 let progressData = null;
 let progressShowAll = false;
 let adminUsersCache = [];
+let ownerCoachesCache = [];
 let viewingUserId = null;
 let viewingUserName = null;
 const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === '1';
@@ -2764,7 +2765,7 @@ async function changePassword() {
 function adminButtons(u) {
     const isAdmin = u.is_admin === 1 || u.is_admin === true;
     const toggleBtn = '<button onclick="toggleAdmin(' + u.id + ')" style="background:var(--gl);color:var(--green-text);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">👑 ' + (isAdmin ? 'Снять' : 'Назначить') + '</button>';
-    const deleteBtn = '<button onclick="deleteUser(' + u.id + ',\'' + u.email + '\')" style="background:var(--error-bg);color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">🗑</button>';
+    const deleteBtn = '<button onclick="deleteUser(' + u.id + ')" style="background:var(--error-bg);color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">🗑</button>';
     const verifyBtn = u.is_verified ? '' : '<button onclick="verifyUser(' + u.id + ')" style="background:var(--gm);color:var(--green-text);border:1px solid var(--green);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;">✅ Верифицировать</button>';
     return isAdmin ? toggleBtn : '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + toggleBtn + verifyBtn + deleteBtn + '</div>';
 }
@@ -2781,8 +2782,8 @@ async function showAdmin() {
     list.innerHTML = data.users.map(u => `
         <div onclick="viewUserData(${u.id})" style="background:var(--bg);border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
             <div>
-                <div style="font-weight:600;font-size:15px;color:var(--text)">${u.name || 'Без имени'} ${u.is_admin ? '👑' : ''}</div>
-                <div style="font-size:15px;color:var(--text2)">${u.email}</div>
+                <div style="font-weight:600;font-size:15px;color:var(--text)">${escapeHtml(u.name || 'Без имени')} ${u.is_admin ? '👑' : ''}</div>
+                <div style="font-size:15px;color:var(--text2)">${escapeHtml(u.email)}</div>
                 <div style="font-size:15px;color:var(--text2)">тренировок: ${u.workout_count} · последняя: ${u.last_workout_date || '—'} · ${(u.created_at||'').slice(0,10)}</div>
             </div>
             <div onclick="event.stopPropagation()">${adminButtons(u)}</div>
@@ -2819,8 +2820,9 @@ async function toggleAdmin(id) {
     else alert(d.message);
 }
 
-async function deleteUser(id, email) {
-    if (!confirm('Удалить ' + email + ' и все его данные?')) return;
+async function deleteUser(id) {
+    const u = adminUsersCache.find(x => x.id === id);
+    if (!confirm('Удалить ' + (u ? u.email : id) + ' и все его данные?')) return;
     const resp = await fetch('/admin/delete-user/' + id, {method: 'DELETE'});
     const d = await resp.json();
     if (resp.ok) showAdmin();
@@ -2864,6 +2866,7 @@ async function showOwnerPanel() {
     const resp = await fetch('/owner/coaches');
     if (!resp.ok) { alert('Нет доступа'); return; }
     const data = await resp.json();
+    ownerCoachesCache = data.coaches;
     const list = document.getElementById('ownerCoachesList');
     if (!data.coaches.length) {
         list.innerHTML = '<p style="color:var(--text2);font-size:15px">Тренеров пока нет</p>';
@@ -2872,17 +2875,18 @@ async function showOwnerPanel() {
     list.innerHTML = data.coaches.map(c => `
         <div style="background:var(--bg);border-radius:10px;padding:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
             <div>
-                <div style="font-weight:600;font-size:15px;color:var(--text)">${c.name || 'Без имени'}</div>
-                <div style="font-size:15px;color:var(--text2)">${c.email}</div>
+                <div style="font-weight:600;font-size:15px;color:var(--text)">${escapeHtml(c.name || 'Без имени')}</div>
+                <div style="font-size:15px;color:var(--text2)">${escapeHtml(c.email)}</div>
                 <div style="font-size:15px;color:var(--text2)">тренер с ${(c.created_at||'').slice(0,10)}</div>
             </div>
-            <button onclick="revokeCoach(${c.id},'${c.email}')" style="background:var(--error-bg);color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;white-space:nowrap;">Отозвать статус</button>
+            <button onclick="revokeCoach(${c.id})" style="background:var(--error-bg);color:white;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;white-space:nowrap;">Отозвать статус</button>
         </div>
     `).join('');
 }
 
-async function revokeCoach(id, email) {
-    if (!confirm('Отозвать статус тренера у ' + email + '?')) return;
+async function revokeCoach(id) {
+    const c = ownerCoachesCache.find(x => x.id === id);
+    if (!confirm('Отозвать статус тренера у ' + (c ? c.email : id) + '?')) return;
     const resp = await fetch('/owner/revoke-coach/' + id, {method: 'POST'});
     const d = await resp.json();
     if (resp.ok) { showToast('Статус тренера отозван'); showOwnerPanel(); }
