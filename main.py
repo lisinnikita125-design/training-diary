@@ -1767,7 +1767,7 @@ def export_csv():
     filename = f"training_{datetime.now().strftime('%Y-%m-%d')}.csv"
     return Response(
         # BOM нужен Excel, иначе UTF-8 читается как cp1251. Именно escape, а не сам невидимый символ.
-        "﻿" + output.getvalue(),
+        "\ufeff" + output.getvalue(),
         mimetype="text/csv; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
