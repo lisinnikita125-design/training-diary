@@ -779,7 +779,7 @@
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                     <span style="font-size:15px;font-weight:600;color:var(--text2);">⚖️ Вес тела</span>
                 </div>
-                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                <div id="bwEntryRow" style="display:flex;gap:8px;margin-bottom:10px;">
                     <input type="number" id="bwInput" step="0.1" placeholder="Вес (кг)" style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);color:var(--text);font-size:15px;">
                     <button class="btn-primary btn-sm" onclick="saveBodyWeight()">Сохранить</button>
                 </div>
@@ -791,7 +791,7 @@
             <div style="margin-top:20px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                     <span style="font-size:15px;font-weight:600;color:var(--text2);">📏 Замеры тела (см)</span>
-                    <button class="btn-secondary btn-sm" onclick="toggleMeasurementsForm()">+ Добавить</button>
+                    <button id="measurementsAddBtn" class="btn-secondary btn-sm" onclick="toggleMeasurementsForm()">+ Добавить</button>
                 </div>
                 <div id="measurementsForm" class="hidden" style="background:var(--card);border-radius:10px;padding:12px;margin-bottom:10px;">
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
@@ -2089,6 +2089,16 @@ function updateViewingBanner() {
     const onWorkoutTab = !document.getElementById('tab-workout').classList.contains('hidden');
     banner.style.display = (viewingUserId && !onWorkoutTab) ? 'flex' : 'none';
     if (viewingUserId) document.getElementById('viewingBannerName').textContent = viewingUserName;
+    updateViewingControls();
+}
+
+// Вес и замеры показываются для подопечного, а POST /body-weight и /measurements
+// пишут текущему пользователю — в режиме просмотра форм ввода быть не должно.
+function updateViewingControls() {
+    const readOnly = !!viewingUserId;
+    document.getElementById('bwEntryRow').style.display = readOnly ? 'none' : 'flex';
+    document.getElementById('measurementsAddBtn').style.display = readOnly ? 'none' : '';
+    if (readOnly) document.getElementById('measurementsForm').classList.add('hidden');
 }
 
 function exitViewingUser() {
@@ -2506,6 +2516,7 @@ function spawnChalkDust(anchorEl) {
 let bodyWeightChartInstance = null;
 
 async function saveBodyWeight() {
+    if (viewingUserId) return;
     const val = parseFloat(document.getElementById('bwInput').value);
     if (!val || val <= 0) { showToast('Введи вес', true); return; }
     const resp = await fetch('/body-weight', {
@@ -2567,6 +2578,7 @@ function toggleMeasurementsForm() {
 }
 
 async function saveMeasurements() {
+    if (viewingUserId) return;
     const body = {
         date: new Date().toISOString().split('T')[0],
         chest_cm: parseFloat(document.getElementById('mChest').value) || null,
