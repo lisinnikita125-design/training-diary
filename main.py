@@ -1824,7 +1824,7 @@ def export_csv():
     return Response(
         # BOM нужен Excel, иначе UTF-8 читается как cp1251. Именно escape, а не сам невидимый символ.
         "\ufeff" + output.getvalue(),
-        mimetype="text/csv; charset=utf-8",
+        mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 

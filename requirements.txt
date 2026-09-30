@@ -1,2 +1,2 @@
-flask
-werkzeug
+flask==3.0.3
+werkzeug==3.0.4
