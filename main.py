@@ -406,12 +406,36 @@ def logout():
 def check_auth():
     if session.get("auth"):
         conn = get_db()
-        user = conn.execute("SELECT email, is_admin FROM users WHERE id=?", (current_user_id(),)).fetchone()
+        user = conn.execute(
+            "SELECT email, is_admin, consent_pdn_at, consent_transfer_at FROM users WHERE id=?",
+            (current_user_id(),)
+        ).fetchone()
         conn.close()
         is_admin = bool(user and user["is_admin"])
         is_owner = bool(user and OWNER_EMAIL and user["email"].lower() == OWNER_EMAIL.lower())
-        return jsonify({"auth": True, "name": session.get("user_name", ""), "is_admin": is_admin, "is_owner": is_owner})
+        needs_consent = bool(user and (user["consent_pdn_at"] is None or user["consent_transfer_at"] is None))
+        return jsonify({"auth": True, "name": session.get("user_name", ""), "is_admin": is_admin,
+                        "is_owner": is_owner, "needs_consent": needs_consent})
     return jsonify({"auth": False})
+
+
+# Согласия для тех, кто зарегистрировался до их появления; новые дают их в /register.
+@app.route("/consent", methods=["POST"])
+def give_consent():
+    require_auth()
+    data = request.get_json() or {}
+    if data.get("consent_pdn") is not True or data.get("consent_transfer") is not True:
+        return jsonify({"status": "error", "message": "Нужно подтвердить согласия"}), 400
+    conn = get_db()
+    conn.execute(
+        "UPDATE users SET consent_pdn_at = COALESCE(consent_pdn_at, CURRENT_TIMESTAMP), "
+        "consent_transfer_at = COALESCE(consent_transfer_at, CURRENT_TIMESTAMP) WHERE id = ?",
+        (current_user_id(),)
+    )
+    conn.commit()
+    conn.close()
+    logger.info(f"CONSENT_GIVEN user_id={current_user_id()}")
+    return jsonify({"status": "ok"})
 
 
 @app.route("/forgot-password", methods=["POST"])

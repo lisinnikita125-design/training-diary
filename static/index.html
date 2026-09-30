@@ -1007,6 +1007,36 @@ function showApp() {
     document.getElementById('app').classList.remove('hidden');
     const ws = document.getElementById('welcomeScreen');
     if (ws) ws.style.display = 'none';
+    ensureConsent();
+}
+
+// Кто зарегистрировался до появления согласий, дают их здесь — без этого дальше не пускаем.
+async function ensureConsent() {
+    const d = await fetch('/check-auth').then(r => r.json()).catch(() => null);
+    if (d && d.auth && d.needs_consent) document.getElementById('consentModal').style.display = 'flex';
+}
+
+async function submitConsent() {
+    const err = document.getElementById('consentError');
+    const pdn = document.getElementById('consentModalPdn').checked;
+    const transfer = document.getElementById('consentModalTransfer').checked;
+    if (!pdn || !transfer) { err.textContent = 'Нужно отметить оба согласия'; return; }
+    err.textContent = '';
+    const resp = await fetch('/consent', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({consent_pdn: pdn, consent_transfer: transfer})
+    }).catch(() => null);
+    if (resp && resp.ok) document.getElementById('consentModal').style.display = 'none';
+    else err.textContent = 'Не удалось сохранить, попробуй ещё раз';
+}
+
+async function declineConsent() {
+    const modal = document.getElementById('consentModal');
+    modal.style.display = 'none';
+    await doLogout();
+    // doLogout может отмениться подтверждением (открыта тренировка) — тогда окно возвращается.
+    if (!document.getElementById('app').classList.contains('hidden')) modal.style.display = 'flex';
 }
 
 // Можно звать, пока #app ещё скрыт (под сплэшем). restoreActiveWorkoutOnLoad
@@ -3087,6 +3117,23 @@ async function loadAchievementsTab() {
         <p style="margin:0;font-size:14px;color:var(--text2);">Только сам факт "кто сейчас тренер" — без доступа к подопечным и их данным.</p>
         <div id="ownerCoachesList"></div>
         <button class="btn-secondary" onclick="document.getElementById('ownerModal').style.display='none'">✕ Закрыть</button>
+    </div>
+</div>
+<div id="consentModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1100;overflow-y:auto;padding:20px;align-items:flex-start;">
+    <div style="background:var(--card);border-radius:16px;padding:24px;width:100%;max-width:420px;margin:40px auto 0;display:flex;flex-direction:column;gap:12px;">
+        <h3 style="margin:0;color:var(--text)">Согласие на обработку данных</h3>
+        <p style="margin:0;font-size:14px;color:var(--text2);line-height:1.5;">Мы опубликовали политику обработки персональных данных. Чтобы продолжить пользоваться Progressor, подтверди согласия ниже.</p>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:14px;color:var(--text);cursor:pointer;line-height:1.4;">
+            <input type="checkbox" id="consentModalPdn" style="width:18px;height:18px;flex-shrink:0;margin-top:1px;">
+            <span>Я согласен(на) с <a href="/privacy" target="_blank" rel="noopener" style="color:var(--green-text);">политикой обработки персональных данных</a> и даю согласие на обработку моих персональных данных</span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:14px;color:var(--text);cursor:pointer;line-height:1.4;">
+            <input type="checkbox" id="consentModalTransfer" style="width:18px;height:18px;flex-shrink:0;margin-top:1px;">
+            <span>Я согласен(на) на трансграничную передачу моих персональных данных (хостинг в США)</span>
+        </label>
+        <button class="btn-primary" onclick="submitConsent()">Продолжить</button>
+        <span id="consentError" style="font-size:14px;color:var(--error-text);text-align:center;"></span>
+        <button class="auth-link" onclick="declineConsent()">Не согласен(на) — выйти</button>
     </div>
 </div>
 <div id="dayManagerModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px;align-items:flex-start;">
