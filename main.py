@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request, abort, session, Response
 from database import get_db, init_db, seed_user
-import os, shutil, csv, io, secrets, json, html, statistics
+import os, shutil, csv, io, secrets, json, html, statistics, math, threading, time
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -317,11 +317,56 @@ def verify_email():
     return render_auth_status_page("✅", "Email подтверждён!", "Сейчас перенаправим тебя на вход — или нажми кнопку ниже.", redirect=True)
 
 
+LOGIN_MAX_FAILS = 5
+LOGIN_LOCK_SECONDS = 300
+LOGIN_FAILS_MAX_ENTRIES = 10000
+# (ip, email) -> (неудач подряд, заблокирован до, время последней неудачи); time.monotonic().
+# Счётчик живёт в памяти процесса: если у веб-приложения несколько процессов, у каждого свой.
+_login_fails = {}
+_login_fails_lock = threading.Lock()
+
+
+def _client_ip():
+    # PythonAnywhere проксирует запросы: remote_addr — адрес прокси, реальный клиент в X-Real-IP.
+    return request.headers.get("X-Real-IP") or request.remote_addr or ""
+
+
+def _login_lock_remaining(key):
+    with _login_fails_lock:
+        _, locked_until, _ = _login_fails.get(key, (0, 0.0, 0.0))
+    return max(0.0, locked_until - time.monotonic())
+
+
+def _register_login_failure(key):
+    now = time.monotonic()
+    with _login_fails_lock:
+        fails, _, last_fail = _login_fails.get(key, (0, 0.0, 0.0))
+        if now - last_fail > LOGIN_LOCK_SECONDS:
+            fails = 0
+        fails += 1
+        if fails >= LOGIN_MAX_FAILS:
+            _login_fails[key] = (0, now + LOGIN_LOCK_SECONDS, now)
+        else:
+            _login_fails[key] = (fails, 0.0, now)
+        if len(_login_fails) > LOGIN_FAILS_MAX_ENTRIES:
+            stale = [k for k, (_, until, last) in _login_fails.items()
+                     if until < now and now - last > LOGIN_LOCK_SECONDS]
+            for k in stale:
+                del _login_fails[k]
+
+
 @app.route("/login", methods=["POST"])
 def login():
     data = request.get_json() or {}
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
+
+    fail_key = (_client_ip(), email)
+    remaining = _login_lock_remaining(fail_key)
+    if remaining > 0:
+        minutes = math.ceil(remaining / 60)
+        return jsonify({"status": "error",
+                        "message": f"Слишком много неудачных попыток входа. Попробуй через {minutes} мин."}), 429
 
     conn = get_db()
     cur = conn.cursor()
@@ -331,7 +376,11 @@ def login():
     conn.close()
 
     if not user or not check_password_hash(user["password_hash"], password):
+        _register_login_failure(fail_key)
+        logger.warning(f"LOGIN_FAILED email={email} ip={fail_key[0]}")
         return jsonify({"status": "error", "message": "Неверный email или пароль"}), 401
+    with _login_fails_lock:
+        _login_fails.pop(fail_key, None)
     if not user["is_verified"]:
         return jsonify({"status": "error", "message": "Подтверди email перед входом"}), 403
 
@@ -1225,6 +1274,13 @@ def log_workout():
     data = request.get_json()
     if not data:
         abort(400, description="Отсутствуют данные")
+    raw_date = data.get("date")
+    try:
+        parsed_date = datetime.strptime(raw_date, "%Y-%m-%d")
+    except (TypeError, ValueError):
+        abort(400, description="Неверный формат даты")
+    if parsed_date.strftime("%Y-%m-%d") != raw_date:
+        abort(400, description="Неверный формат даты")
     uid = current_user_id()
     conn = get_db()
     cur = conn.cursor()
@@ -1472,7 +1528,7 @@ def last_weight(exercise_id):
     if row:
         conn.close()
         return jsonify({"weight": row["weight"]})
-    ex = cur.execute("SELECT default_weight FROM exercises WHERE id = ?", (exercise_id,)).fetchone()
+    ex = cur.execute("SELECT default_weight FROM exercises WHERE id = ? AND user_id = ?", (exercise_id, uid)).fetchone()
     conn.close()
     return jsonify({"weight": ex["default_weight"] if ex else 0})
 
@@ -2418,4 +2474,4 @@ def handle_exception(e):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=os.environ.get("FLASK_DEBUG") == "1")
