@@ -658,6 +658,17 @@ def admin_toggle_admin(user_id):
     conn.close()
     return jsonify({"status": "ok", "is_admin": new_val})
 
+def _delete_user_rows(conn, uid):
+    # Единый список для удаления тренером и самоудаления, чтобы они не расходились.
+    conn.execute("DELETE FROM workout_log WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM body_weight WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM body_measurements WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM exercises WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM day_visibility WHERE user_id=?", (uid,))
+    conn.execute("DELETE FROM coach_trainees WHERE trainee_id=? OR coach_id=?", (uid, uid))
+    conn.execute("DELETE FROM users WHERE id=?", (uid,))
+
+
 @app.route("/admin/delete-user/<int:user_id>", methods=["DELETE"])
 def admin_delete_user(user_id):
     require_admin()
@@ -665,9 +676,7 @@ def admin_delete_user(user_id):
         return jsonify({"status": "error", "message": "Нельзя удалить себя"}), 400
     require_owns_trainee(user_id)
     conn = get_db()
-    conn.execute("DELETE FROM workout_log WHERE user_id=?", (user_id,))
-    conn.execute("DELETE FROM exercises WHERE user_id=?", (user_id,))
-    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+    _delete_user_rows(conn, user_id)
     conn.commit()
     conn.close()
     return jsonify({"status": "ok"})
@@ -2256,11 +2265,7 @@ def delete_account():
     if is_admin and admin_count <= 1:
         conn.close()
         return jsonify({"status": "error", "message": "Нельзя удалить единственного администратора"}), 400
-    conn.execute("DELETE FROM workout_log WHERE user_id=?", (uid,))
-    conn.execute("DELETE FROM body_weight WHERE user_id=?", (uid,))
-    conn.execute("DELETE FROM body_measurements WHERE user_id=?", (uid,))
-    conn.execute("DELETE FROM exercises WHERE user_id=?", (uid,))
-    conn.execute("DELETE FROM users WHERE id=?", (uid,))
+    _delete_user_rows(conn, uid)
     conn.commit()
     conn.close()
     session.clear()
