@@ -876,6 +876,7 @@ let progressData = null;
 let progressShowAll = false;
 let adminUsersCache = [];
 let ownerCoachesCache = [];
+let workoutHistoryCache = [];
 let viewingUserId = null;
 let viewingUserName = null;
 const DEBUG_MODE = new URLSearchParams(location.search).get('debug') === '1';
@@ -1522,6 +1523,7 @@ async function loadWorkoutHistory() {
     container.innerHTML = '<div style="text-align:center;color:var(--text2);padding:20px;">Загрузка...</div>';
     try {
         const data = await fetch(withViewingParam('/workout-history')).then(r => r.json());
+        workoutHistoryCache = data.history || [];
         if (!data.history || data.history.length === 0) {
             container.innerHTML = `<div style="text-align:center;color:var(--text2);padding:20px;display:flex;flex-direction:column;gap:12px;align-items:center;">
                 <span>Тренировок пока нет</span>
@@ -1535,7 +1537,7 @@ async function loadWorkoutHistory() {
                 const tonnage = sets.reduce((sum, s) => sum + s.weight * s.reps, 0);
                 const setsStr = sets.map(s => s.weight + 'x' + s.reps).join(', ');
                 return `<tr>
-                    <td style="text-align:left;padding:5px 8px;font-size:15px;color:var(--text)">${name}</td>
+                    <td style="text-align:left;padding:5px 8px;font-size:15px;color:var(--text)">${escapeHtml(name)}</td>
                     <td style="padding:5px 8px;font-size:15px;color:var(--text2)">${setsStr}</td>
                     <td style="padding:5px 8px;font-size:15px;font-weight:600;color:var(--green-text)">${maxW} кг</td>
                     <td style="padding:5px 8px;font-size:15px;color:var(--text2)">${Math.round(tonnage)} кг</td>
@@ -1544,15 +1546,15 @@ async function loadWorkoutHistory() {
             return `<div style="background:var(--card);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;">
                 <div onclick="toggleHistory(${idx})" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;">
                     <div>
-                        <div style="font-weight:700;font-size:15px;color:var(--text)">${w.date}</div>
-                        <div style="font-size:15px;color:var(--text2);margin-top:2px;">${w.day_name}</div>
+                        <div style="font-weight:700;font-size:15px;color:var(--text)">${escapeHtml(w.date)}</div>
+                        <div style="font-size:15px;color:var(--text2);margin-top:2px;">${escapeHtml(w.day_name)}</div>
                     </div>
                     <div style="display:flex;align-items:center;gap:12px;">
                         <div style="text-align:right;">
                             <div class="num" style="font-weight:700;color:var(--green-text);font-size:17px;">${Math.round(w.total_tonnage)} кг</div>
                             <div style="font-size:15px;color:var(--text2);">${w.duration_seconds ? '⏱ ' + Math.floor(w.duration_seconds/60) + ' мин' : 'тоннаж'}</div>
                         </div>
-                        <button onclick="deleteWorkoutByDate('${w.date}')" style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:var(--error-text);" title="Удалить тренировку">🗑️</button>
+                        <button onclick="deleteWorkoutByDate(${idx})" style="background:none;border:none;cursor:pointer;font-size:18px;padding:4px;color:var(--error-text);" title="Удалить тренировку">🗑️</button>
                     </div>
                 </div>
                 ${w.note ? `<div style="padding:0 16px 12px;font-size:15px;color:var(--text2);">📝 ${escapeHtml(w.note)}</div>` : ''}
@@ -2048,7 +2050,10 @@ async function saveWorkout() {
 // ══════════════════════════════════════════════
 //  ПРОГРЕСС
 // ══════════════════════════════════════════════
-async function deleteWorkoutByDate(date) {
+async function deleteWorkoutByDate(idx) {
+    const w = workoutHistoryCache[idx];
+    if (!w) return;
+    const date = w.date;
     if (!confirm(`Удалить тренировку за ${date}? Это действие нельзя отменить.`)) return;
     const resp = await fetch("/delete-workout", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({workout_date: date})});
     if (resp.ok) {
