@@ -120,7 +120,8 @@ def init_db():
     """)
     cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_measurements_user_date ON body_measurements(user_id, log_date)")
 
-    for col, typ in [("age", "INTEGER"), ("gender", "TEXT"), ("weight_kg", "REAL"), ("goal", "TEXT"), ("height_cm", "INTEGER"), ("is_admin", "INTEGER DEFAULT 0")]:
+    for col, typ in [("age", "INTEGER"), ("gender", "TEXT"), ("weight_kg", "REAL"), ("goal", "TEXT"), ("height_cm", "INTEGER"), ("is_admin", "INTEGER DEFAULT 0"),
+                     ("consent_pdn_at", "TIMESTAMP"), ("consent_transfer_at", "TIMESTAMP")]:
         try:
             cur.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
         except Exception:

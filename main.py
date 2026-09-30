@@ -157,6 +157,11 @@ def send_email(to, subject, body_html):
 #  АВТОРИЗАЦИЯ
 # ══════════════════════════════════════════════
 
+@app.route("/privacy")
+def privacy_page():
+    return app.send_static_file("privacy.html")
+
+
 @app.route("/register", methods=["GET"])
 def register_page():
     # Пригласительная ссылка тренера (/register?invite=<code>) должна открывать
@@ -190,65 +195,65 @@ def register():
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
     name = (data.get("name") or "").strip()
-    is_coach = bool(data.get("is_coach"))
+    invite_code = (data.get("invite") or "").strip()
 
     if not email or "@" not in email:
         return jsonify({"status": "error", "message": "Неверный email"}), 400
     if len(password) < 6:
         return jsonify({"status": "error", "message": "Пароль минимум 6 символов"}), 400
+    if data.get("consent_pdn") is not True or data.get("consent_transfer") is not True:
+        return jsonify({"status": "error", "message": "Нужно подтвердить согласия"}), 400
+
+    def invite_error():
+        return jsonify({"status": "error", "message": "Регистрация доступна только по приглашению"}), 400
+
+    if not invite_code:
+        return invite_error()
 
     conn = get_db()
     cur = conn.cursor()
+    # Код проверяется раньше email: без приглашения нельзя узнать, зарегистрирован ли адрес.
+    invite_row = cur.execute(
+        "SELECT coach_id FROM coach_invites WHERE code = ? AND used_at IS NULL",
+        (invite_code,)
+    ).fetchone()
+    if not invite_row:
+        conn.close()
+        logger.warning(f"COACH_INVITE_INVALID code={invite_code}")
+        return invite_error()
+    invite_coach_id = invite_row["coach_id"]
+
     existing = cur.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
     if existing:
         conn.close()
         return jsonify({"status": "error", "message": "Email уже зарегистрирован"}), 409
 
-    # Код приглашения — опциональное дополнение к обычной регистрации.
-    # Невалидный/использованный код НЕ должен ломать регистрацию: просто
-    # игнорируем его и пользователь становится "осиротевшим", как если бы
-    # кода не было вовсе. Самостоятельная регистрация тренера (is_coach) не
-    # обрабатывает инвайт вообще — тренер не становится чьим-то подопечным.
-    invite_code = (data.get("invite") or "").strip()
-    invite_coach_id = None
-    if invite_code and not is_coach:
-        invite_row = cur.execute(
-            "SELECT coach_id FROM coach_invites WHERE code = ? AND used_at IS NULL",
-            (invite_code,)
-        ).fetchone()
-        if invite_row:
-            invite_coach_id = invite_row["coach_id"]
-        else:
-            logger.warning(f"COACH_INVITE_INVALID code={invite_code}")
-
     token = secrets.token_urlsafe(32)
     cur.execute(
-        "INSERT INTO users (email, password_hash, name, is_verified, verify_token, is_admin) VALUES (?, ?, ?, 0, ?, ?)",
-        (email, generate_password_hash(password), name, token, 1 if is_coach else 0)
+        "INSERT INTO users (email, password_hash, name, is_verified, verify_token, is_admin, consent_pdn_at, consent_transfer_at) "
+        "VALUES (?, ?, ?, 0, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        (email, generate_password_hash(password), name, token)
     )
     user_id = cur.lastrowid
 
-    if invite_coach_id is not None:
-        # Атомарный "захват" кода: UPDATE ... WHERE used_at IS NULL гарантирует,
-        # что при гонке двух одновременных регистраций одним кодом только одна
-        # из них его застолбит — вторая станет обычной "осиротевшей" регистрацией.
-        claimed = cur.execute(
-            "UPDATE coach_invites SET used_at = CURRENT_TIMESTAMP, used_by = ? "
-            "WHERE code = ? AND used_at IS NULL",
-            (user_id, invite_code)
-        )
-        if claimed.rowcount == 1:
-            cur.execute(
-                "INSERT INTO coach_trainees (coach_id, trainee_id) VALUES (?, ?)",
-                (invite_coach_id, user_id)
-            )
-            backfill_exercises_for_new_trainee(cur, invite_coach_id, user_id)
-            logger.info(f"COACH_INVITE_USED code={invite_code} coach_id={invite_coach_id} trainee_id={user_id}")
-        else:
-            logger.warning(f"COACH_INVITE_RACE_LOST code={invite_code} user_id={user_id}")
-
-    if is_coach:
-        logger.info(f"COACH_SELF_REGISTERED user_id={user_id} email={email}")
+    # Атомарный "захват" кода: при гонке двух регистраций одним кодом UPDATE ...
+    # WHERE used_at IS NULL пройдёт только у одной; вторая откатывается целиком.
+    claimed = cur.execute(
+        "UPDATE coach_invites SET used_at = CURRENT_TIMESTAMP, used_by = ? "
+        "WHERE code = ? AND used_at IS NULL",
+        (user_id, invite_code)
+    )
+    if claimed.rowcount != 1:
+        conn.rollback()
+        conn.close()
+        logger.warning(f"COACH_INVITE_RACE_LOST code={invite_code} email={email}")
+        return invite_error()
+    cur.execute(
+        "INSERT INTO coach_trainees (coach_id, trainee_id) VALUES (?, ?)",
+        (invite_coach_id, user_id)
+    )
+    backfill_exercises_for_new_trainee(cur, invite_coach_id, user_id)
+    logger.info(f"COACH_INVITE_USED code={invite_code} coach_id={invite_coach_id} trainee_id={user_id}")
 
     conn.commit()
     conn.close()
