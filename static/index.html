@@ -469,19 +469,22 @@
     </div>
     <div class="auth-box hidden" id="boxRegister">
         <h3>Регистрация</h3>
+        <div id="regInviteNotice" style="font-size:14px;color:var(--green-text);background:var(--gl);border-radius:8px;padding:10px 12px;">Регистрация доступна только по приглашению тренера</div>
+        <div id="regForm" style="display:none;flex-direction:column;gap:12px;">
         <input type="text" id="regName" placeholder="Имя (необязательно)">
         <input type="email" id="regEmail" placeholder="Email">
         <div style="position:relative;display:flex;align-items:center;" data-pw-wrapped="regPassword"><input type="password" id="regPassword" placeholder="Пароль (мин. 6 символов)" onkeydown="if(event.key==='Enter')doRegister()"><button type="button" style="position:absolute;right:10px;background:none;border:none;cursor:pointer;font-size:16px;padding:0;color:var(--text2);min-width:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;" onclick="togglePassword('regPassword',this)">👁</button></div>
-        <div id="regInviteNotice" class="hidden" style="font-size:14px;color:var(--green-text);background:var(--gl);border-radius:8px;padding:10px 12px;">✉️ Ты регистрируешься по приглашению тренера</div>
-        <div id="regCoachRow" style="display:flex;flex-direction:column;gap:4px;padding:4px 2px;">
-            <label style="display:flex;align-items:center;gap:8px;font-size:15px;color:var(--text);cursor:pointer;">
-                <input type="checkbox" id="regIsCoach" style="width:18px;height:18px;flex-shrink:0;">
-                Зарегистрироваться как тренер
-            </label>
-            <span style="font-size:12px;color:var(--text2);padding-left:26px;">Тренер видит тренировки своих подопечных и может назначать им программы</span>
-        </div>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:14px;color:var(--text);cursor:pointer;line-height:1.4;">
+            <input type="checkbox" id="regConsentPdn" style="width:18px;height:18px;flex-shrink:0;margin-top:1px;">
+            <span>Я согласен(на) с <a href="/privacy" target="_blank" rel="noopener" style="color:var(--green-text);">политикой обработки персональных данных</a> и даю согласие на обработку моих персональных данных</span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:14px;color:var(--text);cursor:pointer;line-height:1.4;">
+            <input type="checkbox" id="regConsentTransfer" style="width:18px;height:18px;flex-shrink:0;margin-top:1px;">
+            <span>Я согласен(на) на трансграничную передачу моих персональных данных (хостинг в США)</span>
+        </label>
         <button class="btn-primary" onclick="doRegister()">Создать аккаунт</button>
         <span id="registerError"></span>
+        </div>
         <button class="auth-link" onclick="showBox('login')">Уже есть аккаунт? Войти</button>
     </div>
     <div class="auth-box hidden" id="boxCheckEmail">
@@ -1044,11 +1047,18 @@ async function doRegister() {
     const err = document.getElementById('registerError');
     err.textContent = '';
     if (!email || !pwd) { err.textContent = 'Заполни email и пароль'; return; }
-    const isCoach = pendingInviteCode ? false : document.getElementById('regIsCoach').checked;
+    const consentPdn = document.getElementById('regConsentPdn').checked;
+    const consentTransfer = document.getElementById('regConsentTransfer').checked;
+    if (!consentPdn || !consentTransfer) {
+        err.style.color = 'var(--error-text)';
+        err.textContent = 'Нужно подтвердить согласия выше';
+        return;
+    }
     const resp = await fetch('/register', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({email: email, password: pwd, name: name, invite: pendingInviteCode, is_coach: isCoach})
+        body: JSON.stringify({email: email, password: pwd, name: name, invite: pendingInviteCode,
+                              consent_pdn: consentPdn, consent_transfer: consentTransfer})
     });
     const data = await resp.json();
     if (resp.ok) {
@@ -1312,10 +1322,9 @@ window.onload = async () => {
     await minSplashGuest;
     hideSplashScreen();
     if (pendingInviteCode) {
-        // По инвайт-ссылке нельзя одновременно стать тренером — прячем чекбокс,
-        // чтобы случайный клик не сорвал молча привязку к пригласившему тренеру.
-        document.getElementById('regCoachRow').classList.add('hidden');
-        document.getElementById('regInviteNotice').classList.remove('hidden');
+        // Без кода в ссылке форма регистрации не показывается вовсе (так в разметке по умолчанию).
+        document.getElementById('regInviteNotice').textContent = '✉️ Ты регистрируешься по приглашению тренера';
+        document.getElementById('regForm').style.display = 'flex';
         showBox('register');
     }
 };
