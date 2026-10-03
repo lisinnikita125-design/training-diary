@@ -542,6 +542,9 @@
             <button onclick="doLogout()" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text);display:flex;align-items:center;gap:10px;">
                 <i class="ti ti-logout" aria-hidden="true" style="font-size:18px;line-height:1;color:var(--text2);"></i> Выйти
             </button>
+            <button onclick="document.getElementById('settingsMenu').classList.add('hidden'); window.open('/privacy', '_blank')" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text);display:flex;align-items:center;gap:10px;">
+                <i class="ti ti-file-text" aria-hidden="true" style="font-size:18px;line-height:1;color:var(--text2);"></i> Политика конфиденциальности
+            </button>
             <div id="demoMenuGroup">
             <div style="height:1px;background:var(--border);margin:4px 0;"></div>
             <button onclick="loadDemoData()" style="width:100%;padding:12px 16px;text-align:left;background:none;border:none;cursor:pointer;font-size:15px;color:var(--text2);display:flex;align-items:center;gap:10px;">
