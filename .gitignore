@@ -45,3 +45,5 @@ config.py
 logs/
 patch_*.py
 .claude/
+db_backups/
+.coverage

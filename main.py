@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-import os
 
 # ── Читаем секреты из файла config.py ───────────────────
 try:
@@ -92,7 +91,7 @@ def _migrate_orphan_trainees():
     finally:
         conn.close()
 
-import logging, os
+import logging
 from logging.handlers import RotatingFileHandler
 
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -2394,7 +2393,6 @@ def load_demo():
 
     difficulties = ['Легко', 'Легко', 'Сложно', 'Тяжело', 'Сложно']
     day_cycle = [day1_exercises, day2_exercises, day3_exercises]
-    day_ids = [1, 2, 3]
 
     for i, workout_date in enumerate(workout_days):
         day_idx = i % 3
