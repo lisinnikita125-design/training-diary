@@ -1,6 +1,6 @@
 # Пока только ошибки уровня pyflakes (F): неопределённые имена, лишние импорты,
 # неиспользуемые переменные. Стилевые правила на 2500 строк main.py не включаем.
-include = ["main.py", "database.py", "scripts/**/*.py", "tests/**/*.py"]
+include = ["main.py", "database.py", "db_backup.py", "scripts/**/*.py", "tests/**/*.py"]
 
 [lint]
 select = ["F"]

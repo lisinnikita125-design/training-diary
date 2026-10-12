@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 import backup_db  # noqa: E402
 import check_frontend  # noqa: E402
+import db_backup  # noqa: E402
 
 
 # ── Бэкап базы ───────────────────────────────────────────────
@@ -37,7 +38,7 @@ def test_backup_creates_restorable_snapshot(tmp_path):
     make_db(db_path)
     dest = tmp_path / "db_backups"
 
-    final_path, removed = backup_db.run_backup(str(db_path), str(dest), keep=14,
+    final_path, removed = db_backup.run_backup(str(db_path), str(dest), keep=14,
                                                now=datetime(2026, 10, 12, 3, 5))
 
     assert os.path.basename(final_path) == "training_2026-10-12_0305.db.gz"
@@ -55,7 +56,7 @@ def test_backup_rotation_keeps_newest_and_ignores_foreign_files(tmp_path):
 
     start = datetime(2026, 10, 1, 3, 0)
     for day in range(5):
-        backup_db.run_backup(str(db_path), str(dest), keep=3, now=start + timedelta(days=day))
+        db_backup.run_backup(str(db_path), str(dest), keep=3, now=start + timedelta(days=day))
 
     names = sorted(os.listdir(dest))
     assert names == ["keep-me.txt", "training_2026-10-03_0300.db.gz",
@@ -64,7 +65,7 @@ def test_backup_rotation_keeps_newest_and_ignores_foreign_files(tmp_path):
 
 def test_backup_never_creates_missing_db(tmp_path):
     with pytest.raises(FileNotFoundError):
-        backup_db.run_backup(str(tmp_path / "missing.db"), str(tmp_path / "out"), keep=3)
+        db_backup.run_backup(str(tmp_path / "missing.db"), str(tmp_path / "out"), keep=3)
     assert not (tmp_path / "missing.db").exists()
 
 

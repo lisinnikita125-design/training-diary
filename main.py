@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request, abort, session, Response
-from database import get_db, init_db, seed_user
+from database import get_db, init_db, seed_user, DB_NAME
+import db_backup
 import os, shutil, csv, io, secrets, json, html, statistics, math, threading, time
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -571,16 +572,12 @@ def resolve_target_uid():
 #  БЭКАП
 # ══════════════════════════════════════════════
 def backup_db():
-    db_path = "training.db"
-    backup_dir = "backups"
-    os.makedirs(backup_dir, exist_ok=True)
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    backup_path = os.path.join(backup_dir, f"training_{date_str}.db")
-    if not os.path.exists(backup_path):
-        shutil.copy2(db_path, backup_path)
-    backups = sorted([os.path.join(backup_dir, f) for f in os.listdir(backup_dir) if f.endswith(".db")])
-    for old in backups[:-7]:
-        os.remove(old)
+    # Первая запись тренировки за день делает снимок в db_backups/ (см. db_backup.py).
+    # Старую папку backups/ не трогаем: там training_pre_demo.db для демо-режима
+    # и прежние копии, которые чистятся вручную.
+    path = db_backup.backup_once_per_day(DB_NAME)
+    if path:
+        logger.info(f"DB_BACKUP_CREATED {path}")
 
 
 
@@ -1362,6 +1359,7 @@ def log_workout():
 
     conn.commit()
     conn.close()
+    # Тренировка уже сохранена (commit выше): ошибка бэкапа не должна ломать ответ.
     try:
         backup_db()
     except Exception as e:

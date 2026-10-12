@@ -36,4 +36,4 @@ jobs:
         run: python scripts/check_frontend.py
 
       - name: Tests
-        run: pytest --cov=main --cov=database --cov=scripts --cov-report=term
+        run: pytest --cov=main --cov=database --cov=db_backup --cov=scripts --cov-report=term
