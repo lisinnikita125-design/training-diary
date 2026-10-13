@@ -318,7 +318,10 @@
         #prBanner {
             position: fixed;
             top: 60px; left: 50%;
-            transform: translateX(-50%) translateY(-120px);
+            /* -100% = высота самой плашки, +80px = top и тень: при любом числе рекордов уезжает за экран целиком */
+            transform: translateX(-50%) translateY(calc(-100% - 90px));
+            opacity: 0;
+            pointer-events: none;
             background: linear-gradient(135deg, #E8492B, var(--record));
             color: white;
             padding: 12px 20px;
@@ -326,13 +329,13 @@
             font-size: 15px;
             font-weight: 700;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+            transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease;
             z-index: 400;
             text-align: center;
             max-width: 320px;
             width: 90%;
         }
-        #prBanner.show { transform: translateX(-50%) translateY(0); }
+        #prBanner.show { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
 
         /* PR баннер — анимация личного рекорда */
         #prBannerContent.pr-shake { animation: prShake 180ms ease-out; animation-delay: 90ms; }
